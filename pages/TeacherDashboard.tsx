@@ -1,0 +1,700 @@
+
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { MOCK_STUDENTS, LESSONS } from '../constants';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { PlusCircle, Filter, Download, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings } from 'lucide-react';
+import { StudentStats } from '../types';
+import { playClick, playSuccess } from '../services/audioService';
+import { AddStudentModal } from '../components/AddStudentModal';
+import { AssignHomeworkModal } from '../components/AssignHomeworkModal';
+import { EditStudentModal, EditFormState } from '../components/EditStudentModal';
+import { ChangePasswordForm } from './ChangePasswordForm';
+import { saveCommunication, getCommunications, Communication } from '../services/communicationService';
+import { getStudents } from '../services/studentService';
+
+export const TeacherDashboard: React.FC = () => {
+  const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
+  const [selectedStudent, setSelectedStudent] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [savedNotes, setSavedNotes] = useState<{ studentName: string, note: string, date: string }[]>([]);
+
+  // Class Name State
+  const [className, setClassName] = useState('Lớp 1A3');
+  const [isEditingClass, setIsEditingClass] = useState(false);
+  const [tempClassName, setTempClassName] = useState('');
+
+  // Week Selector State
+  // Week Selector State
+  // Week Selector State
+  const [selectedWeek, setSelectedWeek] = useState<number>(18);
+  const weeks = [10, 11, 12, 13, 14, 15, 16, 17, 18];
+
+  // Feedback/Communications
+  const [parentFeedback, setParentFeedback] = useState<Communication[]>([]);
+
+  useEffect(() => {
+    // Load feedback from parents
+    const loadData = () => {
+      const allComms = getCommunications();
+      const feedback = allComms.filter(c => c.sender === 'PARENT');
+      setParentFeedback(feedback);
+      setStudents(getStudents()); // Refresh students data
+    };
+
+    loadData();
+    window.addEventListener('students_updated', loadData);
+    return () => window.removeEventListener('students_updated', loadData);
+  }, []);
+
+  // Add Student Modal State
+  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+
+  // Edit Student Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<StudentStats | null>(null);
+
+  // Playback State
+  const [playingStudentId, setPlayingStudentId] = useState<string | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Notification State
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    // Cleanup audio when component unmounts or playback stops
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  // Clear notification after 5s
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  // Filter Data based on Selected Week
+  const weekData = useMemo(() => {
+    return students.map(s => {
+      const weekRecord = s.history.find(h => h.week === selectedWeek);
+      return {
+        ...s,
+        currentScore: weekRecord ? weekRecord.score : 0,
+        currentSpeed: weekRecord ? weekRecord.speed : '-',
+      };
+    });
+  }, [students, selectedWeek]);
+
+  const chartData = weekData.map(s => ({
+    name: s.name.split(' ').pop(), // Last name
+    score: s.currentScore,
+  }));
+
+  // --- Class Name Editing Logic ---
+  const startEditingClass = () => {
+    playClick();
+    setTempClassName(className);
+    setIsEditingClass(true);
+  };
+
+  const saveClassName = () => {
+    playClick();
+    if (tempClassName.trim()) {
+      setClassName(tempClassName);
+    }
+    setIsEditingClass(false);
+  };
+
+  const cancelEditingClass = () => {
+    playClick();
+    setIsEditingClass(false);
+  };
+
+  const handleSaveNote = () => {
+    if (!selectedStudent || !noteContent) return;
+    const student = students.find(s => s.id === selectedStudent);
+    if (student) {
+      const newNote = {
+        studentName: student.name,
+        note: noteContent,
+        date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      };
+      setSavedNotes([newNote, ...savedNotes]);
+
+      // Save to shared communications
+      saveCommunication({
+        id: Date.now().toString(),
+        studentId: student.id,
+        studentName: student.name,
+        sender: 'TEACHER',
+        content: noteContent,
+        type: 'NOTE',
+        timestamp: Date.now(),
+        read: false
+      });
+
+      setNoteContent('');
+      setSelectedStudent('');
+      playSuccess(); // Success sound
+    }
+  };
+
+  const handleAddStudent = (newStudentName: string) => {
+    if (!newStudentName) return;
+
+    const newStudent: StudentStats = {
+      id: `s${Date.now()}`,
+      name: newStudentName,
+      completedLessons: 0,
+      averageScore: 0,
+      readingSpeed: 0,
+      history: weeks.map(w => ({ week: w, score: 0, speed: 0 })),
+      lastPractice: new Date(),
+      badges: []
+    };
+
+    setStudents([...students, newStudent]);
+    setIsAddStudentOpen(false);
+    playSuccess(); // Success sound
+  };
+
+  const handleAssignHomework = (lessonId: string, note: string, dueDate: string, readingLimit: number, quizLimit: number) => {
+    try {
+      const lesson = LESSONS.find(l => l.id === lessonId);
+      if (!lesson) {
+        console.error("Lesson not found:", lessonId);
+        return;
+      }
+
+      // Save assignment config for student view
+      const config = {
+        note,
+        dueDate,
+        readingLimit: readingLimit > 0 ? readingLimit * 60 : 0, // Store in seconds
+        quizLimit: quizLimit > 0 ? quizLimit * 60 : 0
+      };
+      localStorage.setItem(`assignment_${lessonId}_config`, JSON.stringify(config));
+
+      // Broadcast assignment to parents
+      saveCommunication({
+        id: Date.now().toString(),
+        studentId: undefined, // Broadcast
+        sender: 'TEACHER',
+        content: `Cô giáo đã giao bài tập "${lesson?.title}". ${note ? 'Lời nhắn: ' + note : ''}`,
+        type: 'HOMEWORK',
+        timestamp: Date.now(),
+        read: false,
+        meta: config
+      });
+
+      playSuccess();
+      setIsAssignModalOpen(false); // Close modal first
+
+      setNotification({
+        message: `Đã giao bài "${lesson?.title}" thành công!`,
+        type: 'success'
+      });
+
+    } catch (e) {
+      console.error("Assignment error:", e);
+      setNotification({
+        message: "Có lỗi xảy ra khi giao bài.",
+        type: 'error'
+      });
+    }
+  };
+
+  const handleDeleteStudent = (id: string, name: string) => {
+    playClick();
+    if (window.confirm(`Bạn có chắc chắn muốn xóa học sinh ${name} khỏi lớp không?`)) {
+      setStudents(prev => prev.filter(s => s.id !== id));
+    }
+  };
+
+  const openEditModal = (student: StudentStats) => {
+    playClick();
+    setEditingStudent(student);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateStudent = useCallback((editForm: EditFormState) => {
+    if (!editingStudent) return;
+
+    setStudents(prev => prev.map(s => {
+      if (s.id !== editingStudent.id) {
+        return s;
+      }
+
+      // Update specific week history
+      const historyExists = s.history.some(h => h.week === selectedWeek);
+      const updatedHistory = historyExists
+        ? s.history.map(h =>
+          h.week === selectedWeek
+            ? { ...h, score: Number(editForm.score), speed: editForm.speed }
+            : h
+        )
+        : [...s.history, { week: selectedWeek, score: Number(editForm.score), speed: editForm.speed }];
+
+      return {
+        ...s,
+        name: editForm.name,
+        completedLessons: Number(editForm.completedLessons),
+        history: updatedHistory,
+        // Update top-level stats if it's the latest week (assuming 13 is the latest)
+        // Update top-level stats if it's the latest week
+        averageScore: selectedWeek === 18 ? Number(editForm.score) : s.averageScore,
+        readingSpeed: selectedWeek === 18 ? editForm.speed : s.readingSpeed
+      };
+    }));
+
+    setIsEditModalOpen(false);
+    setEditingStudent(null);
+    playSuccess();
+  }, [editingStudent, selectedWeek]);
+
+  // --- AUDIO PLAYBACK SIMULATION ---
+  const handlePlayRecording = (student: StudentStats) => {
+    // If currently playing this student, stop it
+    if (playingStudentId === student.id) {
+      window.speechSynthesis.cancel();
+      setPlayingStudentId(null);
+      return;
+    }
+
+    // Stop any other playback
+    window.speechSynthesis.cancel();
+    playClick();
+    setPlayingStudentId(student.id);
+
+    // Get text content for the selected week
+    const lesson = LESSONS.find(l => l.week === selectedWeek);
+    let textToRead = "Thưa cô con đọc bài."; // Default intro
+
+    if (lesson && lesson.readingText.length > 0) {
+      // Read the first 2 lines of the lesson to simulate
+      textToRead += " " + lesson.readingText.slice(0, 2).join('. ');
+    } else {
+      textToRead += " Bài học tuần này rất vui.";
+    }
+
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utteranceRef.current = utterance;
+
+    utterance.lang = 'vi-VN';
+    utterance.rate = 0.9; // Slightly slow like a kid
+    utterance.pitch = 1.4; // High pitch to simulate a child's voice
+
+    utterance.onend = () => setPlayingStudentId(null);
+    utterance.onerror = () => setPlayingStudentId(null);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  return (
+    <div className="space-y-8 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-[100] px-6 py-4 rounded-xl shadow-2xl animate-fade-in-left flex items-center gap-3 ${notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-500 text-white'
+          }`}>
+          {notification.type === 'success' ? <Check className="w-6 h-6" /> : <X className="w-6 h-6" />}
+          <div>
+            <p className="font-bold text-lg">Thông báo</p>
+            <p className="text-sm opacity-90">{notification.message}</p>
+          </div>
+          <button onClick={() => setNotification(null)} className="ml-4 p-1 hover:bg-white/20 rounded-full transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            {isEditingClass ? (
+              <div className="flex items-center gap-2 animate-fade-in">
+                <input
+                  type="text"
+                  value={tempClassName}
+                  onChange={(e) => setTempClassName(e.target.value)}
+                  className="text-2xl font-bold text-gray-900 border border-blue-300 rounded px-2 py-1 w-48 focus:ring-2 focus:ring-primary outline-none"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && saveClassName()}
+                />
+                <button onClick={saveClassName} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors" title="Lưu">
+                  <Check className="w-5 h-5" />
+                </button>
+                <button onClick={cancelEditingClass} className="p-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors" title="Hủy">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group cursor-pointer" onClick={startEditingClass}>
+                <h1 className="text-2xl font-bold text-gray-900">Tổng Quan {className}</h1>
+                <Edit2 className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-all hover:text-primary" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500">Thống kê:</span>
+            <div className="relative inline-block">
+              <select
+                value={selectedWeek}
+                onChange={(e) => setSelectedWeek(Number(e.target.value))}
+                className="appearance-none bg-blue-50 border border-blue-200 text-blue-800 font-bold py-1 px-3 pr-8 rounded-lg cursor-pointer hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                {weeks.map(w => (
+                  <option key={w} value={w}>Tuần {w}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-blue-800 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <button
+            onClick={() => { playClick(); setIsAddStudentOpen(true); }}
+            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-sm transition-all transform hover:scale-105"
+          >
+            <UserPlus className="w-4 h-4 mr-2" /> Thêm Học Sinh
+          </button>
+          <button
+            onClick={() => playClick()}
+            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+          >
+            <Download className="w-4 h-4 mr-2" /> Xuất Báo Cáo
+          </button>
+          <button
+            onClick={() => { playClick(); setIsAssignModalOpen(true); }}
+            className="flex items-center px-4 py-2 bg-primary text-white rounded-lg font-bold hover:bg-blue-600 shadow-sm"
+          >
+            <PlusCircle className="w-4 h-4 mr-2" /> Giao Bài Mới
+          </button>
+          <button
+            onClick={() => { playClick(); setIsSettingsOpen(true); }}
+            className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+            title="Cài đặt"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <p className="text-sm font-medium text-gray-500 mb-1">Sĩ số lớp</p>
+          <p className="text-3xl font-bold text-gray-900">{students.length}</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <p className="text-sm font-medium text-gray-500 mb-1">Đã nộp bài (Tuần {selectedWeek})</p>
+          <p className="text-3xl font-bold text-green-600">
+            {weekData.filter(s => s.currentScore > 0).length}/{students.length}
+          </p>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <p className="text-sm font-medium text-gray-500 mb-1">Điểm trung bình (Tuần {selectedWeek})</p>
+          <p className="text-3xl font-bold text-primary">
+            {weekData.filter(s => s.currentScore > 0).length > 0
+              ? Math.round(weekData.reduce((acc, curr) => acc + curr.currentScore, 0) / weekData.filter(s => s.currentScore > 0).length)
+              : 0}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Chart */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-bold text-gray-800 mb-6">Biểu đồ điểm số Tuần {selectedWeek}</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                <YAxis axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ fill: '#EFF6FF' }}
+                />
+                <Bar dataKey="score" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Right Column: Alerts & Notes */}
+        <div className="space-y-6">
+          {/* Action Items / Alerts */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Cần Hỗ Trợ</h3>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                <div className="w-10 h-10 rounded-full bg-red-200 flex items-center justify-center text-red-700 font-bold flex-shrink-0">
+                  T
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">Thào Thị Thảo</p>
+                  <p className="text-xs text-red-600">Chưa biết đọc</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
+                <div className="w-10 h-10 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 font-bold flex-shrink-0">
+                  L
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">Vừ Bảo Ly</p>
+                  <p className="text-xs text-orange-600">Còn phải đánh vần</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                <div className="w-10 h-10 rounded-full bg-yellow-200 flex items-center justify-center text-yellow-700 font-bold flex-shrink-0">
+                  L
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">Vừ Thành Long</p>
+                  <p className="text-xs text-yellow-600">Còn phải đánh vần</p>
+                </div>
+              </div>
+            </div>
+            <button className="w-full mt-4 text-primary text-sm font-bold hover:underline">
+              Xem tất cả
+            </button>
+          </div>
+
+          {/* New: Manual Note Input Section */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Ghi Chú Nhanh
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Học sinh</label>
+                <select
+                  value={selectedStudent}
+                  onChange={(e) => setSelectedStudent(e.target.value)}
+                  className="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                >
+                  <option value="">-- Chọn học sinh --</option>
+                  {students.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú lỗi phát âm</label>
+                <textarea
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  rows={3}
+                  placeholder="Ví dụ: Em hay sai dấu ngã ở các từ 'gỗ', 'đỗ'..."
+                  className="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
+
+              <button
+                onClick={handleSaveNote}
+                disabled={!selectedStudent || !noteContent}
+                className="w-full flex items-center justify-center px-4 py-2 bg-secondary text-blue-900 font-bold rounded-lg hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Lưu Ghi Chú
+              </button>
+            </div>
+
+            {/* Recently Saved Notes */}
+            {savedNotes.length > 0 && (
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Ghi chú vừa thêm</h4>
+                <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+                  {savedNotes.map((note, idx) => (
+                    <div key={idx} className="text-sm bg-gray-50 p-2 rounded border border-gray-200">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-gray-800">{note.studentName}</span>
+                        <span className="text-xs text-gray-400">{note.date}</span>
+                      </div>
+                      <p className="text-gray-600 italic">"{note.note}"</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Parent Feedback Section */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-orange-500" />
+              Phản hồi từ Phụ huynh
+            </h3>
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {parentFeedback.length === 0 ? (
+                <p className="text-gray-500 text-sm italic">Chưa có phản hồi mới.</p>
+              ) : (
+                parentFeedback.map(comm => (
+                  <div key={comm.id} className="text-sm bg-orange-50 p-3 rounded-lg border border-orange-100">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-bold text-gray-800">PH em {comm.studentName}</span>
+                      <span className="text-xs text-gray-400">{new Date(comm.timestamp).toLocaleDateString('vi-VN')}</span>
+                    </div>
+                    <p className="text-gray-700">"{comm.content}"</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Student List */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-gray-800">Danh Sách Học Sinh - Tuần {selectedWeek}</h3>
+            <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full">{students.length} em</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { playClick(); setIsAddStudentOpen(true); }}
+              className="flex items-center px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg text-sm font-bold border border-green-200 transition-colors"
+            >
+              <PlusCircle className="w-4 h-4 mr-1.5" /> Thêm mới
+            </button>
+            <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
+              <Filter className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-semibold">
+              <tr>
+                <th className="px-6 py-4 text-left">Học sinh</th>
+                <th className="px-6 py-4 text-center">Tốc độ (tiếng/phút)</th>
+                <th className="px-6 py-4 text-center">Điểm Tuần {selectedWeek}</th>
+                <th className="px-6 py-4 text-center">Bản ghi âm</th>
+                <th className="px-6 py-4 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {weekData.map((student) => (
+                <tr key={student.id} className="hover:bg-blue-50/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
+                        {student.name.charAt(0)}
+                      </div>
+                      <span className="font-medium text-gray-900">{student.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`inline-block px-3 py-1 rounded text-sm font-bold ${typeof student.currentSpeed === 'string'
+                      ? 'bg-red-100 text-red-600' // Status like "Đánh vần"
+                      : Number(student.currentSpeed) >= 30 ? 'bg-green-100 text-green-700'
+                        : Number(student.currentSpeed) >= 15 ? 'bg-blue-100 text-blue-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                      {student.currentSpeed}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`font-bold ${student.currentScore >= 80 ? 'text-green-600' :
+                      student.currentScore >= 50 ? 'text-blue-600' :
+                        student.currentScore === 0 ? 'text-gray-400' : 'text-red-500'
+                      }`}>
+                      {student.currentScore === 0 ? '-' : student.currentScore}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {student.currentScore > 0 ? (
+                      <button
+                        onClick={() => handlePlayRecording(student)}
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${playingStudentId === student.id
+                          ? 'bg-green-100 text-green-700 ring-2 ring-green-400'
+                          : 'bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600'
+                          }`}
+                      >
+                        {playingStudentId === student.id ? (
+                          <>
+                            <StopCircle className="w-3 h-3 animate-pulse" /> Đang phát...
+                          </>
+                        ) : (
+                          <>
+                            <PlayCircle className="w-3 h-3" /> Nghe lại
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Chưa nộp</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openEditModal(student)}
+                        className="text-gray-400 hover:text-blue-500 transition-colors"
+                        title={`Chỉnh sửa điểm tuần ${selectedWeek}`}
+                      >
+                        <Edit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStudent(student.id, student.name)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        title="Xóa học sinh"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add Student Modal */}
+      <AddStudentModal
+        isOpen={isAddStudentOpen}
+        onClose={() => setIsAddStudentOpen(false)}
+        onAdd={handleAddStudent}
+      />
+
+      {/* Edit Student Modal */}
+      <EditStudentModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onUpdate={handleUpdateStudent}
+        student={editingStudent}
+        week={selectedWeek}
+      />
+
+      <AssignHomeworkModal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        onAssign={handleAssignHomework}
+      />
+
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="relative">
+            <button
+              onClick={() => setIsSettingsOpen(false)}
+              className="absolute -top-3 -right-3 bg-white rounded-full p-1 shadow-md hover:bg-gray-100 z-10"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+            <ChangePasswordForm />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

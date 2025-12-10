@@ -1,0 +1,7 @@
+{
+  "name": "CÙNG EM LUYỆN ĐỌC",
+  "description": "Ứng dụng luyện đọc tiếng Việt thông minh dành cho học sinh lớp 1, hỗ trợ giáo viên và phụ huynh theo dõi tiến độ.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
