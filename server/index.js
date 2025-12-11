@@ -37,14 +37,12 @@ app.get('/', (req, res) => {
 // Serve frontend if it exists
 const distPath = path.join(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
-    console.log("Serving frontend from:", distPath);
-    app.use(express.static(distPath));
-  const distPath = path.join(__dirname, '../dist');
+   // Serve frontend if it exists
+const distPath = path.join(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
     console.log("Serving frontend from:", distPath);
     app.use(express.static(distPath));
     
-    // Sửa lại catch-all route
     app.get('(.*)', (req, res) => {
         if (!req.path.startsWith('/api')) {
             res.sendFile(path.join(distPath, 'index.html'));
@@ -54,22 +52,6 @@ if (fs.existsSync(distPath)) {
     console.log("Frontend not found");
 }
 
-// Thêm vào cuối file
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-});
-        }
-    });
-} else {
-    console.log("Frontend not found");
-}
-    console.log("WARNING: 'dist' folder not found. Only API is running.");
-}
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 DEBUG SERVER STARTED on port ${PORT}`);
-    console.log(`Running on: http://0.0.0.0:${PORT}`);
-});
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });
