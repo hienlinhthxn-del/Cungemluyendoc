@@ -8,21 +8,23 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     base: '/',
+    // Server config is only for local dev
     server: {
       port: 3000,
       host: true,
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
-          changeOrigin: true,
-          secure: false,
-        },
-        '/uploads': {
-          target: 'http://localhost:3001',
+          target: 'http://localhost:10000', // Redirect to Render port if running dev mode on server (rare)
           changeOrigin: true,
           secure: false,
         }
       }
+    },
+    build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
+      sourcemap: false,
+      emptyOutDir: true,
     },
     resolve: {
       alias: {

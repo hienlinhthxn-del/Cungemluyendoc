@@ -2,12 +2,15 @@ services:
   - type: web
     name: cung-em-luyen-doc
     runtime: node
-    region: singapore
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
-        value: 20.10.0
-      - key: PORT
-        value: 10000
+        value: 20
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=512
+      - key: NPM_CONFIG_PRODUCTION
+        value: false
+      - key: CI
+        value: false
