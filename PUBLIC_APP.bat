@@ -7,7 +7,7 @@ echo.
 
 :: 1. Start the server in the background
 echo [1/2] Dang chay server noi bo...
-start /B node server/index.cjs > server_log.txt 2>&1
+start /B node server/index.js > server_log.txt 2>&1
 
 :: Wait a bit for server to start
 timeout /t 3 /nobreak >nul

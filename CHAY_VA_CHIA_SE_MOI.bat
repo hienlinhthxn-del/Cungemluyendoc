@@ -29,4 +29,4 @@ echo    QUAN TRỌNG: KHÔNG ĐƯỢC TẮT CỬA SỔ NÀY!
 echo.
 
 :: Chạy server chính trực tiếp bằng node (không qua npm để tránh lỗi)
-cmd /k "node server/index.cjs"
+cmd /k "node server/index.js"

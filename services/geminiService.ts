@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { GeminiFeedbackSchema } from "../types";
 
 const getClient = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("API Key not found. Using mock simulation.");
     return null;
