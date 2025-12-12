@@ -52,9 +52,14 @@ if (process.env.CLOUDINARY_CLOUD_NAME) {
         api_secret: process.env.CLOUDINARY_API_SECRET
     });
 
-    folder: 'reading-app-audio',
-        resource_type: 'auto',
-            upload = multer({ storage: storage });
+    const storage = new CloudinaryStorage({
+        cloudinary: cloudinary,
+        params: {
+            folder: 'reading-app-audio',
+            resource_type: 'auto',
+        },
+    });
+    upload = multer({ storage: storage });
     console.log("✅ Cloudinary Configured!");
 } else {
     console.warn("⚠️ Cloudinary credentials missing. File uploads will fail.");
