@@ -57,6 +57,10 @@ if (process.env.CLOUDINARY_CLOUD_NAME) {
         params: {
             folder: 'reading-app-audio',
             resource_type: 'auto',
+            format: async (req, file) => {
+                // Keep original extension or fallback
+                return file.originalname.split('.').pop() || 'webm';
+            },
         },
     });
     upload = multer({ storage: storage });
