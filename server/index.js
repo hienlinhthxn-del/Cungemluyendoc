@@ -52,15 +52,9 @@ if (process.env.CLOUDINARY_CLOUD_NAME) {
         api_secret: process.env.CLOUDINARY_API_SECRET
     });
 
-    const storage = new CloudinaryStorage({
-        cloudinary: cloudinary,
-        params: {
-            folder: 'reading-app-audio',
-            resource_type: 'auto',
-            allowed_formats: ['mp3', 'wav', 'webm', 'ogg', 'm4a', 'mp4'],
-        },
-    });
-    upload = multer({ storage: storage });
+    folder: 'reading-app-audio',
+        resource_type: 'auto',
+            upload = multer({ storage: storage });
     console.log("✅ Cloudinary Configured!");
 } else {
     console.warn("⚠️ Cloudinary credentials missing. File uploads will fail.");
@@ -93,14 +87,39 @@ app.get('/api/health', (req, res) => {
 });
 
 // Upload Audio Route
-app.post('/api/lessons/:lessonId/custom-audio', upload.single('audioFile'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No audio file uploaded' });
+// Middleware wrapper to catch Multer/Cloudinary errors
+const uploadMiddleware = (req, res, next) => {
+    if (!upload) {
+        return res.status(500).json({ error: 'Cloudinary not configured on server' });
+    }
+    const uploader = upload.single('audioFile');
+    uploader(req, res, (err) => {
+        if (err) {
+            console.error("❌ Upload Middleware Error:", err);
+            return res.status(500).json({
+                error: 'Upload Failed',
+                details: err.message
+            });
         }
+        next();
+    });
+};
+
+app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, res) => {
+    try {
+        console.log("📥 Upload Request Received for:", req.body.text);
+        console.log("📁 File info:", req.file);
+
+        if (!req.file) {
+            console.error("❌ No file in request");
+            return res.status(400).json({ error: 'No audio file received' });
+        }
+
         const { lessonId } = req.params;
         const { text } = req.body;
         const audioUrl = req.file.path; // Cloudinary URL
+
+        console.log("✅ Cloudinary URL generated:", audioUrl);
 
         // Save to DB
         if (mongoose.connection.readyState === 1) {
@@ -109,12 +128,15 @@ app.post('/api/lessons/:lessonId/custom-audio', upload.single('audioFile'), asyn
                 { audioUrl },
                 { upsert: true, new: true }
             );
+            console.log("✅ Saved to MongoDB");
+        } else {
+            console.warn("⚠️ MongoDB not connected, skipping DB save");
         }
 
         res.json({ audioUrl, text });
     } catch (error) {
-        console.error("Upload Error:", error);
-        res.status(500).json({ error: 'Upload failed' });
+        console.error("❌ Processing Error:", error);
+        res.status(500).json({ error: 'Server processing failed', details: error.message });
     }
 });
 

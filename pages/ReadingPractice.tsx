@@ -450,7 +450,8 @@ export const ReadingPractice: React.FC = () => {
     if (!lesson?.id) return;
 
     const formData = new FormData();
-    formData.append('audioFile', blob);
+    const ext = supportedMimeType.includes('mp4') ? 'mp4' : 'webm';
+    formData.append('audioFile', blob, `recording.${ext}`);
     formData.append('lessonId', lesson.id);
     formData.append('text', text);
 
@@ -461,12 +462,19 @@ export const ReadingPractice: React.FC = () => {
         method: 'POST',
         body: formData,
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || errorData.error || "Server Error");
+      }
+
       const data = await response.json();
       setCustomVoiceMap(prev => ({ ...prev, [text]: data.audioUrl }));
       playSuccess();
     } catch (error) {
       console.error("Upload failed:", error);
-      alert("Tải lên giọng đọc thất bại.");
+      console.error("Upload failed details:", error);
+      alert(`Tải lên thất bại: ${error instanceof Error ? error.message : "Lỗi không xác định"}`);
       playError();
     } finally {
       setIsUploading(null);
