@@ -169,6 +169,38 @@ app.get('/api/lessons/:lessonId/custom-audio', async (req, res) => {
     }
 });
 
+// --- DEBUG ROUTE: Check Cloudinary Connection ---
+app.get('/api/test-cloudinary', async (req, res) => {
+    try {
+        if (!process.env.CLOUDINARY_CLOUD_NAME) {
+            return res.status(500).json({
+                status: 'error',
+                message: 'Missing Environment Variables',
+                env: {
+                    cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
+                    api_key: !!process.env.CLOUDINARY_API_KEY,
+                    api_secret: !!process.env.CLOUDINARY_API_SECRET
+                }
+            });
+        }
+
+        // Try to ping Cloudinary by verifying credentials
+        const result = await cloudinary.api.ping();
+        res.json({
+            status: 'success',
+            message: 'Cloudinary Connected Successfully!',
+            details: result
+        });
+    } catch (error) {
+        console.error("Cloudinary Test Error:", error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Cloudinary Connection Failed',
+            error: error.message
+        });
+    }
+});
+
 
 // --- 6. SERVE FRONTEND ---
 const distPath = path.join(__dirname, '../dist');
