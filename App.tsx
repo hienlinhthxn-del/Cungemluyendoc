@@ -155,6 +155,7 @@ const RoleSelector: React.FC<{ onSelect: (role: UserRole) => void }> = ({ onSele
           </div>
           <h3 className="text-xl font-bold text-gray-800">Giáo Viên</h3>
           <p className="text-sm text-gray-500 mt-2">Quản lý lớp học</p>
+          <span className="text-xs text-green-600 mt-1 font-mono">(v2.0 Check)</span>
         </button>
 
         <button
