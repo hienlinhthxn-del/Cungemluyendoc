@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { MOCK_STUDENTS, LESSONS } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { PlusCircle, Filter, Download, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings } from 'lucide-react';
+import { PlusCircle, Filter, Download, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings, BookOpen } from 'lucide-react';
 import { StudentStats } from '../types';
 import { playClick, playSuccess } from '../services/audioService';
 import { AddStudentModal } from '../components/AddStudentModal';
@@ -403,6 +403,36 @@ export const TeacherDashboard: React.FC = () => {
               ? Math.round(weekData.reduce((acc, curr) => acc + curr.currentScore, 0) / weekData.filter(s => s.currentScore > 0).length)
               : 0}
           </p>
+        </div>
+      </div>
+
+      {/* LESSON MANAGEMENT & PREVIEW */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <BookOpen className="w-5 h-5 text-blue-600" />
+          Kho Bài Đọc Tuần {selectedWeek}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {LESSONS.filter(l => l.week === selectedWeek).map(lesson => (
+            <div key={lesson.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors bg-blue-50/30">
+              <h4 className="font-bold text-gray-900 mb-1">{lesson.title}</h4>
+              <p className="text-xs text-gray-500 mb-3 line-clamp-2">{lesson.description}</p>
+              <button
+                onClick={() => {
+                  playClick();
+                  // Force navigation to student practice page
+                  window.location.hash = `/student/practice/${lesson.id}`;
+                }}
+                className="w-full py-2 bg-white border border-blue-500 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-50 flex items-center justify-center gap-2"
+              >
+                <Edit className="w-4 h-4" />
+                Sửa Giọng Đọc
+              </button>
+            </div>
+          ))}
+          {LESSONS.filter(l => l.week === selectedWeek).length === 0 && (
+            <p className="text-gray-500 italic text-sm col-span-3">Chưa có bài đọc nào cho tuần này.</p>
+          )}
         </div>
       </div>
 

@@ -932,6 +932,22 @@ export const ReadingPractice: React.FC = () => {
             <div>
               <p className="font-bold">Đang ở chế độ chỉnh sửa giọng đọc mẫu</p>
               <p className="text-sm mt-1">Bấm vào bất kỳ từ/câu nào bên dưới để <span className="font-bold">GHI ÂM</span> giọng của bạn cho từ đó. Bấm lần nữa để Dừng & Lưu.</p>
+              <div className="mt-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const h = await fetch('/api/health').then(r => r.json()).catch(e => ({ status: 'error', err: e.message }));
+                      const c = await fetch('/api/test-cloudinary').then(r => r.json()).catch(e => ({ status: 'error/404', err: e.message }));
+                      alert(`🔍 KẾT QUẢ KIỂM TRA:\n\n1. Server Health: ${JSON.stringify(h)}\n\n2. Cloudinary: ${JSON.stringify(c)}`);
+                    } catch (e) {
+                      alert("Lỗi kiểm tra: " + e);
+                    }
+                  }}
+                  className="px-3 py-1 bg-red-600 text-white rounded text-xs font-bold shadow hover:bg-red-700 transition-colors"
+                >
+                  📡 BẤM VÀO ĐÂY ĐỂ KIỂM TRA LỖI
+                </button>
+              </div>
             </div>
           </div>
         )}
