@@ -22,20 +22,6 @@ export default defineConfig(({ mode }) => {
         },
         define: {
             'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-        },
-        server: {
-            proxy: {
-                '/api': {
-                    target: 'http://localhost:10000',
-                    changeOrigin: true,
-                    secure: false,
-                },
-                '/uploads': { // Proxy uploads folder
-                    target: 'http://localhost:10000',
-                    changeOrigin: true,
-                    secure: false,
-                }
-            }
         }
     };
 });
