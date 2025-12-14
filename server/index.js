@@ -65,9 +65,6 @@ if (process.env.CLOUDINARY_CLOUD_NAME) {
     });
     upload = multer({ storage: storage });
     console.log("✅ Cloudinary Configured!");
-});
-upload = multer({ storage: storage });
-console.log("✅ Cloudinary Configured!");
 } else {
     console.warn("⚠️ Cloudinary credentials missing. Switching to Local Disk Storage.");
 
