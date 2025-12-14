@@ -149,21 +149,23 @@ app.get('/api/students', async (req, res) => {
 // CREATE / SYNC Student
 app.post('/api/students', async (req, res) => {
     try {
-        const { id, name } = req.body;
-        // Upsert: Update if exists, Insert if new
+        const { id, name, completedLessons, averageScore, readingSpeed, history, badges } = req.body;
+
+        // Prepare update data. undefined fields won't overwrite existing unless specified.
+        const updateData = { name };
+        if (completedLessons !== undefined) updateData.completedLessons = completedLessons;
+        if (averageScore !== undefined) updateData.averageScore = averageScore;
+        if (readingSpeed !== undefined) updateData.readingSpeed = readingSpeed;
+        if (history !== undefined) updateData.history = history;
+        if (badges !== undefined) updateData.badges = badges;
+
         const student = await Student.findOneAndUpdate(
             { id: id },
             {
-                $setOnInsert: {
-                    name,
-                    completedLessons: 0,
-                    averageScore: 0,
-                    readingSpeed: 0,
-                    history: [],
-                    badges: []
-                }
+                $set: updateData,
+                $setOnInsert: { lastPractice: new Date() }
             },
-            { new: true, upsert: true } // Upsert option
+            { new: true, upsert: true }
         );
         res.json(student);
     } catch (err) {

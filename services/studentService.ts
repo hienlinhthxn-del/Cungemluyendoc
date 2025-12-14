@@ -3,19 +3,30 @@ import { MOCK_STUDENTS } from '../constants';
 
 const STUDENTS_STORAGE_KEY = 'app_students_data';
 
+// Helper to dedupe students by ID
+const dedupeStudents = (list: StudentStats[]): StudentStats[] => {
+    const seen = new Set();
+    return list.filter(s => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+    });
+};
+
 export const getStudents = (): StudentStats[] => {
     try {
-        const data = localStorage.getItem(STUDENTS_STORAGE_KEY);
-        if (data) {
-            return JSON.parse(data, (key, value) => {
-                if (key === 'lastPractice') return new Date(value);
-                return value;
-            });
-        }
+        const stored = localStorage.getItem(STUDENTS_STORAGE_KEY);
+        if (!stored) return []; // Return empty if nothing stored
+
+        const parsed = JSON.parse(stored, (key, value) => {
+            if (key === 'lastPractice') return new Date(value);
+            return value;
+        });
+        return dedupeStudents(parsed);
     } catch (e) {
         console.error("Failed to load students", e);
+        return [];
     }
-    return MOCK_STUDENTS;
 };
 
 // NEW: Force sync with server (Call this from Dashboard)
@@ -26,20 +37,22 @@ export const syncWithServer = async () => {
 
         if (Array.isArray(serverData)) {
             const localStudents = getStudents();
-            let hasChanges = false;
-            const finalStudents = [...serverData];
+
+            // Start with server data
+            let finalStudents = [...serverData];
 
             // MERGE: Keep local students that are not on server
             localStudents.forEach(localS => {
                 if (!serverData.find(serverS => serverS.id === localS.id)) {
                     finalStudents.push(localS);
-                    // Optional: Backfill to server
                     syncStudentToServer(localS);
                 }
             });
 
+            // Deduplicate final list just in case
+            finalStudents = dedupeStudents(finalStudents);
+
             // Check if actual change occurred (simple count check or deep compare)
-            // For safety, providing we have data, we save.
             if (finalStudents.length > 0) {
                 localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(finalStudents));
                 window.dispatchEvent(new Event('students_updated'));
@@ -55,7 +68,15 @@ const syncStudentToServer = async (student: StudentStats) => {
         await fetch('/api/students', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: student.id, name: student.name })
+            body: JSON.stringify({
+                id: student.id,
+                name: student.name,
+                completedLessons: student.completedLessons,
+                averageScore: student.averageScore,
+                readingSpeed: student.readingSpeed,
+                history: student.history,
+                badges: student.badges
+            })
         });
     } catch (e) {
         console.error("Backfill failed", e);
