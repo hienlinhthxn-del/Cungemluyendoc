@@ -38,6 +38,7 @@ export interface WeeklyStats {
   week: number;
   score: number;
   speed: string | number; // Words per minute or status
+  audioUrl?: string; // Recording URL
 }
 
 export interface StudentStats {

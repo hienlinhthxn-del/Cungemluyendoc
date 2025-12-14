@@ -90,11 +90,12 @@ const StudentSchema = new mongoose.Schema({
     name: { type: String, required: true },
     completedLessons: { type: Number, default: 0 },
     averageScore: { type: Number, default: 0 },
-    readingSpeed: { type: mongoose.Schema.Types.Mixed, default: 0 }, // Number or string (e.g. 'Đánh vần')
+    readingSpeed: { type: mongoose.Schema.Types.Mixed, default: 0 }, // Number or string
     history: [{
         week: Number,
         score: Number,
-        speed: mongoose.Schema.Types.Mixed
+        speed: mongoose.Schema.Types.Mixed,
+        audioUrl: String // New field for recording
     }],
     badges: [String],
     lastPractice: { type: Date, default: Date.now }
@@ -103,6 +104,15 @@ const StudentSchema = new mongoose.Schema({
 const Student = mongoose.model('Student', StudentSchema);
 
 // --- 5. API ROUTES ---
+
+// UPLOAD STUDENT AUDIO
+app.post('/api/upload-student-audio', uploadMiddleware, (req, res) => {
+    if (req.file && req.file.path) {
+        res.json({ url: req.file.path });
+    } else {
+        res.status(400).json({ error: 'No audio file uploaded' });
+    }
+});
 
 // GET All Students
 app.get('/api/students', async (req, res) => {
@@ -147,7 +157,7 @@ app.post('/api/students', async (req, res) => {
 app.post('/api/students/:id/progress', async (req, res) => {
     try {
         const { id } = req.params;
-        const { score, speed, week, lessonTitle } = req.body;
+        const { score, speed, week, lessonTitle, audioUrl } = req.body;
 
         const student = await Student.findOne({ id });
         if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -159,8 +169,9 @@ app.post('/api/students/:id/progress', async (req, res) => {
             // For now, overwrite with latest attempt
             student.history[historyIndex].score = score;
             student.history[historyIndex].speed = speed;
+            if (audioUrl) student.history[historyIndex].audioUrl = audioUrl; // Save URL
         } else {
-            student.history.push({ week, score, speed });
+            student.history.push({ week, score, speed, audioUrl });
         }
 
         // Recalc Stats

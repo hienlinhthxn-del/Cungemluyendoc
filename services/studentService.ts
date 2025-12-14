@@ -37,21 +37,53 @@ export const syncWithServer = async () => {
     }
 };
 
-export const saveStudentResult = async (studentId: string, week: number, score: number, speed: number | string) => {
+export const saveStudentResult = async (studentId: string, week: number, score: number, speed: number | string, audioBlob?: Blob) => {
     const students = getStudents();
     const index = students.findIndex(s => s.id === studentId);
 
     if (index !== -1) {
         const student = students[index];
+        let uploadedAudioUrl = '';
 
-        // Update Local State (Optimistic UI)
+        // 1. Upload Audio if exists
+        if (audioBlob) {
+            try {
+                const formData = new FormData();
+                // Determine extension (mp4 or webm)
+                const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+                formData.append('audioFile', audioBlob, `student_${studentId}_w${week}.${ext}`);
+
+                const uploadRes = await fetch('/api/upload-student-audio', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (uploadRes.ok) {
+                    const data = await uploadRes.json();
+                    uploadedAudioUrl = data.url;
+                }
+            } catch (e) {
+                console.error("Failed to upload student audio", e);
+            }
+        }
+
+        // 2. Update Local State (Optimistic UI)
         const historyIndex = student.history.findIndex(h => h.week === week);
+        const historyItem: WeeklyStats = { week, score, speed };
+        if (uploadedAudioUrl) historyItem.audioUrl = uploadedAudioUrl;
+
         if (historyIndex !== -1) {
-            student.history[historyIndex] = { week, score, speed };
+            // Preserve existing audioUrl if new one failed? 
+            // Or if simple update? Assume overwrite for now.
+            if (!uploadedAudioUrl && student.history[historyIndex].audioUrl) {
+                historyItem.audioUrl = student.history[historyIndex].audioUrl;
+            }
+            student.history[historyIndex] = historyItem;
         } else {
-            student.history.push({ week, score, speed });
+            student.history.push(historyItem);
             student.history.sort((a, b) => a.week - b.week);
         }
+
         student.lastPractice = new Date();
         const totalScore = student.history.reduce((acc, curr) => acc + curr.score, 0);
         student.averageScore = Math.round(totalScore / student.history.length);
@@ -61,7 +93,7 @@ export const saveStudentResult = async (studentId: string, week: number, score: 
         localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(students));
         window.dispatchEvent(new Event('students_updated'));
 
-        // SYNC TO SERVER (Background)
+        // 3. SYNC TO SERVER (Background)
         try {
             // First ensure student exists on server
             await fetch('/api/students', {
@@ -70,11 +102,11 @@ export const saveStudentResult = async (studentId: string, week: number, score: 
                 body: JSON.stringify({ id: student.id, name: student.name })
             });
 
-            // Then save progress
+            // Then save progress with audioUrl
             await fetch(`/api/students/${studentId}/progress`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ week, score, speed })
+                body: JSON.stringify({ week, score, speed, audioUrl: uploadedAudioUrl })
             });
         } catch (e) {
             console.error("Background sync failed:", e);

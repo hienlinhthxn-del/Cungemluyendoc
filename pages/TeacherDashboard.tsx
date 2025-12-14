@@ -466,6 +466,67 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* STUDENT SUBMISSIONS LIST & AUDIO */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">Danh Sách Nộp Bài (Tuần {selectedWeek})</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left text-gray-600">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 rounded-l-lg">Học Sinh</th>
+                <th className="px-4 py-3">Điểm Số</th>
+                <th className="px-4 py-3">Ghi Âm</th>
+                <th className="px-4 py-3 rounded-r-lg">Chi tiết</th>
+              </tr>
+            </thead>
+            <tbody>
+              {weekData.map(student => {
+                const audioUrl = student.history.find(h => h.week === selectedWeek)?.audioUrl;
+                return (
+                  <tr key={student.id} className="border-b hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-gray-900 flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
+                        {student.name.split(' ').pop()?.[0]}
+                      </div>
+                      {student.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${student.currentScore >= 80 ? 'bg-green-100 text-green-700' :
+                          student.currentScore >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                        {student.currentScore > 0 ? `${student.currentScore} đ` : 'Chưa thi'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {audioUrl ? (
+                        <button
+                          onClick={() => {
+                            playClick();
+                            const audio = new Audio(audioUrl);
+                            audio.play().catch(e => alert("Lỗi phát audio: " + e.message));
+                          }}
+                          className="flex items-center gap-1 text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded-full text-xs font-bold shadow-sm transition-all transform hover:scale-105"
+                          title="Nghe giọng đọc"
+                        >
+                          <PlayCircle className="w-3 h-3" /> Nghe
+                        </button>
+                      ) : (
+                        <span className="text-gray-300 text-xs italic">--</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => openEditModal(student)} className="p-1 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Chart */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">

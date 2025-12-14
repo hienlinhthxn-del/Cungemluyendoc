@@ -746,7 +746,7 @@ export const ReadingPractice: React.FC = () => {
       // Simulate lesson completion
       if (student) {
         student.completedLessons = Math.max(student.completedLessons, parseInt(lesson.id.replace('w', ''), 10)); // Extract week number safely
-        saveStudentResult(student.id, lesson.week, feedback.score, feedback.reading_speed || 0);
+        saveStudentResult(student.id, lesson.week, feedback.score, feedback.reading_speed || 0, blobToProcess);
       }
       setPartialRecordingId(null);
 
