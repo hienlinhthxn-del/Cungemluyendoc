@@ -451,8 +451,8 @@ export const LESSONS: Lesson[] = [
 // Helper to generate history for a student based on their current (week 13) stats
 const generateHistory = (currentScore: number, currentSpeed: string | number) => {
   const history = [];
-  // Generate random fluctuations for weeks 10-18
-  for (let w = 10; w <= 18; w++) {
+  // Generate random fluctuations for weeks 1-18
+  for (let w = 1; w <= 18; w++) {
     let score = currentScore;
     let speed = currentSpeed;
 
