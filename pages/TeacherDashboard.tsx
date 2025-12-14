@@ -168,7 +168,18 @@ export const TeacherDashboard: React.FC = () => {
       badges: []
     };
 
-    setStudents([...students, newStudent]);
+    // Save to LocalStorage
+    const updatedStudents = [...students, newStudent];
+    setStudents(updatedStudents);
+    localStorage.setItem('app_students_data', JSON.stringify(updatedStudents));
+
+    // Save to Server
+    fetch('/api/students', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: newStudent.id, name: newStudent.name })
+    }).catch(err => console.error("Failed to sync new student to server", err));
+
     setIsAddStudentOpen(false);
     playSuccess(); // Success sound
   };
