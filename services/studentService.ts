@@ -158,3 +158,10 @@ export const initializeStudentsIfEmpty = async () => {
     // Try to sync/merge on startup
     syncWithServer();
 };
+
+export const resetToMock = () => {
+    localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(MOCK_STUDENTS));
+    window.dispatchEvent(new Event('students_updated'));
+    // Also sync to server to be safe
+    MOCK_STUDENTS.forEach(s => syncStudentToServer(s));
+};

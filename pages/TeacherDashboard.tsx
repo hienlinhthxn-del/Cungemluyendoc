@@ -10,7 +10,7 @@ import { AssignHomeworkModal } from '../components/AssignHomeworkModal';
 import { EditStudentModal, EditFormState } from '../components/EditStudentModal';
 import { ChangePasswordForm } from './ChangePasswordForm';
 import { saveCommunication, getCommunications, Communication } from '../services/communicationService';
-import { getStudents, syncWithServer } from '../services/studentService';
+import { getStudents, syncWithServer, resetToMock } from '../services/studentService';
 
 export const TeacherDashboard: React.FC = () => {
   const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
@@ -393,6 +393,17 @@ export const TeacherDashboard: React.FC = () => {
             <UserPlus className="w-4 h-4 mr-2" /> Thêm Học Sinh
           </button>
           <button
+            onClick={() => {
+              if (window.confirm("Cô có chắc muốn khôi phục lại danh sách học sinh mẫu ban đầu không? (Dữ liệu hiện tại sẽ bị ghi đè)")) {
+                resetToMock();
+                playSuccess();
+              }
+            }}
+            className="flex items-center px-4 py-2 bg-red-100 text-red-600 border border-red-200 rounded-lg font-bold hover:bg-red-200 shadow-sm"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" /> Khôi phục Mẫu
+          </button>
+          <button
             onClick={() => playClick()}
             className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
           >
@@ -492,7 +503,7 @@ export const TeacherDashboard: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${student.currentScore >= 80 ? 'bg-green-100 text-green-700' :
-                          student.currentScore >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'
+                        student.currentScore >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'
                         }`}>
                         {student.currentScore > 0 ? `${student.currentScore} đ` : 'Chưa thi'}
                       </span>
