@@ -5,7 +5,7 @@ import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
-    const config = {
+    return {
         plugins: [react()],
         base: '/',
         resolve: {
@@ -17,5 +17,4 @@ export default defineConfig(({ mode }) => {
             'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
         }
     };
-    return config;
 });
