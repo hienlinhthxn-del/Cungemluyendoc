@@ -139,10 +139,22 @@ export const saveStudentResult = async (studentId: string, week: number, score: 
     }
 };
 
-export const initializeStudentsIfEmpty = () => {
-    if (!localStorage.getItem(STUDENTS_STORAGE_KEY)) {
-        localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(MOCK_STUDENTS));
+export const initializeStudentsIfEmpty = async () => {
+    const stored = localStorage.getItem(STUDENTS_STORAGE_KEY);
+    let students: StudentStats[] = stored ? JSON.parse(stored) : [];
+
+    if (students.length === 0) {
+        console.log("Restoring MOCK DATA...");
+        students = MOCK_STUDENTS;
+        localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(students));
+
+        // Backfill MOCK data to server immediately
+        for (const s of students) {
+            await syncStudentToServer(s);
+        }
+        window.dispatchEvent(new Event('students_updated'));
     }
-    // Try to sync on startup
+
+    // Try to sync/merge on startup
     syncWithServer();
 };
