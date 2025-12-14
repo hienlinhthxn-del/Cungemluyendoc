@@ -24,9 +24,8 @@ export const TeacherDashboard: React.FC = () => {
   const [tempClassName, setTempClassName] = useState('');
 
   // Week Selector State
-  // Week Selector State
   const [selectedWeek, setSelectedWeek] = useState<number>(18);
-  const weeks = [10, 11, 12, 13, 14, 15, 16, 17, 18];
+  const weeks = Array.from(new Set(LESSONS.map(l => l.week))).sort((a, b) => b - a);
 
   // Feedback/Communications
   const [parentFeedback, setParentFeedback] = useState<Communication[]>([]);
