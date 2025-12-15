@@ -835,19 +835,39 @@ export const TeacherDashboard: React.FC = () => {
 
 // --- SYSTEM HEALTH CHECK COMPONENT ---
 const SystemHealthCheck = () => {
-  const [health, setHealth] = useState<{ mongo: string, cloudinary: boolean } | null>(null);
+  const [health, setHealth] = useState<{ mongo: string, cloudinary: string, cloudDetails?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/health')
-      .then(res => res.json())
-      .then(data => setHealth(data))
-      .catch(err => console.error("Health Check Failed", err));
+    const checkSystems = async () => {
+      try {
+        // 1. Check Basic Health (Mongo)
+        const healthRes = await fetch('/api/health');
+        const healthData = await healthRes.json();
+
+        // 2. Check Cloudinary Connection (Real Ping)
+        const cloudRes = await fetch('/api/test-cloudinary');
+        const cloudData = await cloudRes.json();
+
+        setHealth({
+          mongo: healthData.mongo,
+          cloudinary: cloudData.status, // 'success' or 'error'
+          cloudDetails: cloudData.message
+        });
+      } catch (e) {
+        console.error("System Check Error", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSystems();
   }, []);
 
-  if (!health) return null;
+  if (loading || !health) return null;
 
   const mongoIssue = health.mongo !== 'connected';
-  const cloudIssue = !health.cloudinary;
+  const cloudIssue = health.cloudinary !== 'success';
 
   if (!mongoIssue && !cloudIssue) return null;
 
@@ -858,19 +878,25 @@ const SystemHealthCheck = () => {
           <AlertCircle className="h-5 w-5 text-red-500" />
         </div>
         <div className="ml-3">
-          <h3 className="text-sm font-bold text-red-800 uppercase">Cảnh Báo Hệ Thống</h3>
+          <h3 className="text-sm font-bold text-red-800 uppercase">CẢNH BÁO LỖI HỆ THỐNG (QUAN TRỌNG)</h3>
           <div className="mt-2 text-sm text-red-700">
-            <ul className="list-disc pl-5 space-y-1">
+            <ul className="list-disc pl-5 space-y-2">
               {mongoIssue && (
                 <li>
-                  <strong>Chưa kết nối Cơ sở dữ liệu (MongoDB):</strong> Dữ liệu học sinh và điểm số sẽ bị <span className="underline font-bold">MẤT</span> khi khởi động lại.
-                  <br /><span className="text-xs italic">Cách sửa: Thêm biến <code>MONGODB_URI</code> vào cấu hình Render.</span>
+                  <strong className="block">❌ CHƯA LƯU ĐƯỢC DANH SÁCH HỌC SINH (MongoDB Lỗi)</strong>
+                  <span>Server đang chạy chế độ tạm. Sau 15 phút không dùng, toàn bộ danh sách học sinh sẽ bị mất và quay về 2 học sinh mẫu.</span>
+                  <br />
+                  <span className="font-semibold text-xs bg-white px-1 border border-red-200 rounded">Cách sửa:</span> <span className="text-xs">Bạn chưa điền đúng <code>MONGODB_URI</code> trên Render.</span>
                 </li>
               )}
               {cloudIssue && (
                 <li>
-                  <strong>Chưa kết nối Lưu trữ (Cloudinary):</strong> File ghi âm sẽ bị xóa sau một thời gian ngắn.
-                  <br /><span className="text-xs italic">Cách sửa: Kiểm tra lại <code>CLOUDINARY_API_KEY</code> và <code>CLOUDINARY_API_SECRET</code> trên Render.</span>
+                  <strong className="block">❌ KHÔNG LƯU ĐƯỢC FILE GHI ÂM (Cloudinary Lỗi)</strong>
+                  <span>Kết nối đến kho lưu trữ thất bại: "{health.cloudDetails}"</span>
+                  <br />
+                  <span className="text-xs">Nguyên nhân: API Key hoặc API Secret trên Render bị sai.</span>
+                  <br />
+                  <span className="font-semibold text-xs bg-white px-1 border border-red-200 rounded">Cách sửa:</span> <span className="text-xs">Vào Render kiểm tra lại <code>CLOUDINARY_API_SECRET</code> (coi chừng copy thừa dấu cách).</span>
                 </li>
               )}
             </ul>
