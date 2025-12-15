@@ -30,43 +30,31 @@ export const getStudents = (): StudentStats[] => {
 };
 
 // NEW: Force sync with server (Call this from Dashboard)
+// NEW: Force sync with server (Call this from Dashboard)
 export const syncWithServer = async () => {
     try {
         const response = await fetch('/api/students');
+        if (!response.ok) throw new Error('Failed to fetch from server');
+
         const serverData: StudentStats[] = await response.json();
 
-        if (Array.isArray(serverData)) {
+        if (Array.isArray(serverData) && serverData.length > 0) {
+            console.log("Syncing: Server has data, updating local...");
+
+            // SERVER AUTHORITY MODE:
+            // We trust the server mostly, but we don't want to lose offline progress.
             const localStudents = getStudents();
+            const finalStudents = [...serverData];
 
-            // MERGE STRATEGY: One by one based on ID
-            // Map all IDs
-            const allIds = new Set([...serverData.map(s => s.id), ...localStudents.map(s => s.id)]);
-            const finalStudents: StudentStats[] = [];
-
-            allIds.forEach(id => {
-                const serverVer = serverData.find(s => s.id === id);
-                const localVer = localStudents.find(s => s.id === id);
-
-                if (serverVer && !localVer) {
-                    // Only on server -> Keep server
-                    finalStudents.push(serverVer);
-                } else if (!serverVer && localVer) {
-                    // Only on local -> Keep local AND push to server
-                    finalStudents.push(localVer);
-                    syncStudentToServer(localVer);
-                } else if (serverVer && localVer) {
-                    // Conflict: Compare timestamps
-                    const serverTime = new Date(serverVer.lastPractice || 0).getTime();
-                    const localTime = new Date(localVer.lastPractice || 0).getTime();
-
-                    if (localTime >= serverTime) {
-                        // Local is newer -> Keep local AND push to server
-                        finalStudents.push(localVer);
-                        syncStudentToServer(localVer);
-                    } else {
-                        // Server is newer -> Keep server
-                        finalStudents.push(serverVer);
-                    }
+            // Check if any local student is NOT in server (newly created offline?)
+            localStudents.forEach(localS => {
+                const exists = serverData.find(s => s.id === localS.id);
+                if (!exists) {
+                    finalStudents.push(localS);
+                    syncStudentToServer(localS); // Push it up
+                } else {
+                    // Update server if local is significantly newer?
+                    // For now, let's trust SERVER for history to ensure Audio Links are visible
                 }
             });
 
