@@ -41,21 +41,27 @@ export const syncWithServer = async () => {
         if (Array.isArray(serverData) && serverData.length > 0) {
             console.log("Syncing: Server has data, updating local...");
 
-            // SERVER AUTHORITY MODE:
-            // We trust the server mostly, but we don't want to lose offline progress.
             const localStudents = getStudents();
-            const finalStudents = [...serverData];
 
-            // Check if any local student is NOT in server (newly created offline?)
-            localStudents.forEach(localS => {
-                const exists = serverData.find(s => s.id === localS.id);
-                if (!exists) {
-                    finalStudents.push(localS);
-                    syncStudentToServer(localS); // Push it up
-                } else {
-                    // Update server if local is significantly newer?
-                    // For now, let's trust SERVER for history to ensure Audio Links are visible
-                }
+            // MERGE STRATEGY: Server Authority + Smart Merge for Audio
+            const finalStudents = serverData.map(serverStudent => {
+                const localStudent = localStudents.find(s => s.id === serverStudent.id);
+                if (!localStudent) return serverStudent;
+
+                // If Local has Audio URL but Server doesn't, preserve Local Audio
+                // This happens when Upload finishes but Sync hasn't run yet
+                const mergedHistory = serverStudent.history.map(serverH => {
+                    const localH = localStudent.history.find(h => h.week === serverH.week);
+                    if (localH && localH.audioUrl && !serverH.audioUrl) {
+                        return { ...serverH, audioUrl: localH.audioUrl };
+                    }
+                    return serverH;
+                });
+
+                return {
+                    ...serverStudent,
+                    history: mergedHistory
+                };
             });
 
             // Save merged list
