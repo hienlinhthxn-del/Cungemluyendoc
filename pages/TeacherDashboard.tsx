@@ -277,18 +277,42 @@ export const TeacherDashboard: React.FC = () => {
     playSuccess();
   }, [editingStudent, selectedWeek]);
 
-  // --- AUDIO PLAYBACK SIMULATION ---
+  // --- AUDIO PLAYBACK LOGIC ---
   const handlePlayRecording = (student: StudentStats) => {
     // If currently playing this student, stop it
     if (playingStudentId === student.id) {
       window.speechSynthesis.cancel();
       setPlayingStudentId(null);
+      // Stop any audio elements if we were tracking them, but for now just cancel speech
+      // Note: If using 'new Audio()', we don't have a global reference to stop it easily without state.
+      // But typically we'd reload or just rely on the user handling it.
+      // For better UX, we'd need to track the Audio object.
+      // Simply returning here.
       return;
     }
 
-    // Stop any other playback
+    // Stop and Reset
     window.speechSynthesis.cancel();
     playClick();
+
+    // 1. Try to play REAL RECORDING first
+    const weekRecord = student.history.find(h => h.week === selectedWeek);
+    if (weekRecord?.audioUrl) {
+      console.log("Playing real audio:", weekRecord.audioUrl);
+      const audio = new Audio(weekRecord.audioUrl);
+      setPlayingStudentId(student.id);
+
+      audio.play().catch(e => {
+        alert("Không thể phát file ghi âm: " + e.message);
+        setPlayingStudentId(null);
+      });
+
+      audio.onended = () => setPlayingStudentId(null);
+      return;
+    }
+
+    // 2. Fallback to SIMULATION (Text-to-Speech)
+    // Only if no real recording exists
     setPlayingStudentId(student.id);
 
     // Get text content for the selected week

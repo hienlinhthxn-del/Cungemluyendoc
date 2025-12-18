@@ -106,7 +106,8 @@ export const saveStudentResult = async (studentId: string, week: number, score: 
             try {
                 // Upload audio to Cloudinary
                 const formData = new FormData();
-                formData.append('audioFile', audioBlob); // MATCH SERVER EXPECTATION
+                const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+                formData.append('audioFile', audioBlob, `student_${studentId}_w${week}.${ext}`); // MATCH SERVER EXPECTATION
 
                 const response = await fetch('/api/upload-student-audio', {
                     method: 'POST',

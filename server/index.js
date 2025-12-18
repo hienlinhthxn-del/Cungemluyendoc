@@ -29,11 +29,11 @@ const PORT = process.env.PORT || 10000;
 // --- 1. DATABASE CONNECTION ---
 const connectDB = async () => {
     try {
-        const uri = process.env.MONGODB_URI;
-        if (!uri) {
-            console.warn("⚠️ MONGODB_URI is missing. Database features will be disabled.");
-            return;
+        const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/reading-app';
+        if (!process.env.MONGODB_URI) {
+            console.warn("⚠️ MONGODB_URI missing in .env. Trying local default:", uri);
         }
+
         await mongoose.connect(uri);
         console.log("✅ MongoDB Connected Successfully!");
     } catch (error) {
@@ -147,19 +147,16 @@ const Student = mongoose.models.Student || mongoose.model('Student', StudentSche
 // UPLOAD STUDENT AUDIO
 app.post('/api/upload-student-audio', uploadMiddleware, (req, res) => {
     if (req.file) {
-        let fileUrl = req.file.path;
+        // Cloudinary/Multer usually puts the URL in 'path' or 'secure_url'
+        let fileUrl = req.file.secure_url || req.file.path; // Try secure_url first (HTTPS), then path
 
-        // If we are using local disk storage, req.file.path is a system path.
-        // We need to convert it to a URL accessible by the frontend.
+        // If we are using local disk storage (fallback), req.file.path is a system path.
         if (!process.env.CLOUDINARY_CLOUD_NAME) {
-            // Assuming the file is in 'uploads/' and we are serving it via /uploads
-            // We construct a relative URL (or absolute if needed)
             const filename = req.file.filename;
-            // Use relative path so it works with proxy/tunnel if needed, 
-            // but absolute URL is safer for some clients. Let's use relative for now.
             fileUrl = `/uploads/${filename}`;
         }
 
+        console.log("✅ File uploaded, URL:", fileUrl);
         res.json({ url: fileUrl });
     } else {
         res.status(400).json({ error: 'No audio file uploaded' });
