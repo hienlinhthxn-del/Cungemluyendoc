@@ -142,6 +142,29 @@ const StudentSchema = new mongoose.Schema({
 
 const Student = mongoose.models.Student || mongoose.model('Student', StudentSchema);
 
+// --- FILE-BASED AUDIO MAP FALLBACK (For local run without MongoDB) ---
+const AUDIO_MAP_FILE = path.join(__dirname, 'audio-map.json');
+
+const loadAudioMap = () => {
+    if (fs.existsSync(AUDIO_MAP_FILE)) {
+        try {
+            return JSON.parse(fs.readFileSync(AUDIO_MAP_FILE, 'utf8'));
+        } catch (e) {
+            console.error("Error reading audio-map.json:", e);
+            return {};
+        }
+    }
+    return {};
+};
+
+const saveAudioMap = (data) => {
+    try {
+        fs.writeFileSync(AUDIO_MAP_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+        console.error("Error writing audio-map.json:", e);
+    }
+};
+
 // --- 5. API ROUTES ---
 
 // UPLOAD STUDENT AUDIO
@@ -149,6 +172,11 @@ app.post('/api/upload-student-audio', uploadMiddleware, (req, res) => {
     if (req.file) {
         // Cloudinary/Multer usually puts the URL in 'path' or 'secure_url'
         let fileUrl = req.file.secure_url || req.file.path; // Try secure_url first (HTTPS), then path
+
+        // Force HTTPS for Cloudinary URLs to prevent Mixed Content errors on Render
+        if (fileUrl && fileUrl.startsWith('http:') && fileUrl.includes('cloudinary.com')) {
+            fileUrl = fileUrl.replace('http:', 'https:');
+        }
 
         // If we are using local disk storage (fallback), req.file.path is a system path.
         if (!process.env.CLOUDINARY_CLOUD_NAME) {
@@ -271,11 +299,16 @@ app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, re
 
         const { lessonId } = req.params;
         const { text } = req.body;
-        const audioUrl = req.file.path; // Cloudinary URL
+
+        // Force HTTPS for Cloudinary
+        let audioUrl = req.file.secure_url || req.file.path;
+        if (audioUrl && audioUrl.startsWith('http:') && audioUrl.includes('cloudinary.com')) {
+            audioUrl = audioUrl.replace('http:', 'https:');
+        }
 
         console.log("✅ Cloudinary URL generated:", audioUrl);
 
-        // Save to DB
+        // Save to DB (or JSON fallback)
         if (mongoose.connection.readyState === 1) {
             await LessonAudio.findOneAndUpdate(
                 { lessonId, text },
@@ -284,7 +317,11 @@ app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, re
             );
             console.log("✅ Saved to MongoDB");
         } else {
-            console.warn("⚠️ MongoDB not connected, skipping DB save");
+            console.warn("⚠️ MongoDB not connected, skipping DB save. Saving to audio-map.json");
+            const map = loadAudioMap();
+            if (!map[lessonId]) map[lessonId] = {};
+            map[lessonId][text] = audioUrl;
+            saveAudioMap(map);
         }
 
         res.json({ audioUrl, text });
@@ -298,16 +335,22 @@ app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, re
 app.get('/api/lessons/:lessonId/custom-audio', async (req, res) => {
     try {
         const { lessonId } = req.params;
-        if (mongoose.connection.readyState !== 1) {
-            return res.json({}); // Return empty if no DB
+
+        // Prioritize Mongo if connected
+        if (mongoose.connection.readyState === 1) {
+            const audios = await LessonAudio.find({ lessonId });
+            // Convert to map: { "text": "url" }
+            const audioMap = audios.reduce((acc, curr) => {
+                acc[curr.text || ""] = curr.audioUrl;
+                return acc;
+            }, {});
+            return res.json(audioMap);
         }
-        const audios = await LessonAudio.find({ lessonId });
-        // Convert to map: { "text": "url" }
-        const audioMap = audios.reduce((acc, curr) => {
-            acc[curr.text || ""] = curr.audioUrl;
-            return acc;
-        }, {});
-        res.json(audioMap);
+
+        // Fallback to local JSON map
+        console.log(`⚠️ MongoDB disconnected. reading from audio-map.json for lesson ${lessonId}`);
+        const map = loadAudioMap();
+        res.json(map[lessonId] || {});
     } catch (error) {
         console.error("Fetch Audio Error:", error);
         res.status(500).json({ error: 'Failed to fetch audio' });
