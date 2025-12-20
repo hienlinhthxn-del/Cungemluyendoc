@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import * as xlsx from 'xlsx';
 import dotenv from 'dotenv'; // Load env vars
 
 // Helper to load env manually if not loaded (for local dev)
@@ -315,6 +316,62 @@ app.delete('/api/students/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// --- IMPORT STUDENTS FROM EXCEL ---
+const uploadTemp = multer({ dest: 'uploads/temp/' });
+app.post('/api/students/import', uploadTemp.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        console.log("📂 Processing Excel file:", req.file.path);
+        const workbook = xlsx.readFile(req.file.path);
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(sheet);
+
+        let count = 0;
+        const classId = req.body.classId || '1A3';
+
+        console.log(`📊 Found ${data.length} rows. Target Class: ${classId}`);
+
+        for (const row of data) {
+            // Flexible column names
+            const name = row['Họ và tên'] || row['Name'] || row['Tên'] || row['Họ tên'] || row['student_name'];
+            if (!name) continue;
+
+            const studentId = `s${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+            const newStudent = {
+                id: studentId,
+                name: String(name).trim(),
+                classId: classId,
+                completedLessons: 0,
+                averageScore: 0,
+                readingSpeed: 0,
+                history: [],
+                lastPractice: new Date(),
+                badges: []
+            };
+
+            await Student.create(newStudent);
+            count++;
+        }
+
+        // Cleanup temp file
+        try { fs.unlinkSync(req.file.path); } catch (e) {
+            console.error("Warning: Could not delete temp file", e);
+        }
+
+        console.log(`✅ Imported ${count} students successfully.`);
+        res.json({ success: true, count, message: `Thêm thành công ${count} học sinh!` });
+
+    } catch (error) {
+        console.error("❌ Import Failed:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 

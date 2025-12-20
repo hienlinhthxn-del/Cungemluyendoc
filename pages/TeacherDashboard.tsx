@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { MOCK_STUDENTS, LESSONS } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { PlusCircle, Filter, Download, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings, BookOpen, RefreshCw, AlertCircle } from 'lucide-react';
+import { PlusCircle, Filter, Download, Upload, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings, BookOpen, RefreshCw, AlertCircle } from 'lucide-react';
 import { StudentStats } from '../types';
 import { playClick, playSuccess } from '../services/audioService';
 import { AddStudentModal } from '../components/AddStudentModal';
@@ -78,6 +78,44 @@ export const TeacherDashboard: React.FC = () => {
   const [playingStudentId, setPlayingStudentId] = useState<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.match(/\.(xlsx|xls)$/)) {
+      setNotification({ message: "Vui lòng chọn file Excel (.xlsx, .xls)", type: 'error' });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('classId', classId);
+
+    setNotification({ message: "Đang nhập dữ liệu...", type: 'success' });
+
+    try {
+      const res = await fetch('/api/students/import', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setNotification({ message: data.message, type: 'success' });
+        playSuccess();
+        await syncWithServer(classId);
+      } else {
+        setNotification({ message: "Lỗi: " + data.error, type: 'error' });
+      }
+    } catch (err: any) {
+      setNotification({ message: "Lỗi kết nối: " + err.message, type: 'error' });
+    }
+
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   // Notification State
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
@@ -496,6 +534,24 @@ export const TeacherDashboard: React.FC = () => {
             className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-sm transition-all transform hover:scale-105"
           >
             <UserPlus className="w-4 h-4 mr-2" /> Thêm Học Sinh
+          </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportExcel}
+            accept=".xlsx, .xls"
+            className="hidden"
+          />
+          <button
+            onClick={() => {
+              playClick();
+              fileInputRef.current?.click();
+            }}
+            className="flex items-center px-4 py-2 bg-green-100 text-green-700 border border-green-200 rounded-lg font-bold hover:bg-green-200 shadow-sm transition-all"
+            title="Nhập danh sách học sinh từ file Excel"
+          >
+            <Upload className="w-4 h-4 mr-2" /> Nhập Excel
           </button>
 
           <button
