@@ -453,6 +453,26 @@ export const TeacherDashboard: React.FC = () => {
                 title="Nhập mã lớp để chuyển đổi dữ liệu"
               />
             </div>
+
+            {/* TEMPORARY MIGRATION BUTTON */}
+            <button
+              onClick={async () => {
+                if (confirm('Bạn có chắc muốn chuyển toàn bộ học sinh cũ vào lớp 1A3 không?')) {
+                  try {
+                    const res = await fetch('/api/migrate-legacy-data');
+                    const data = await res.json();
+                    alert(data.message || 'Thành công!');
+                    await syncWithServer(classId); // Refresh
+                  } catch (e) {
+                    alert('Lỗi: ' + e);
+                  }
+                }
+              }}
+              className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 text-xs px-2 py-1 rounded border border-yellow-300 transition-colors"
+              title="Bấm vào đây nếu bạn không thấy học sinh cũ trong lớp 1A3"
+            >
+              Sửa Lỗi Dữ Liệu Cũ
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
