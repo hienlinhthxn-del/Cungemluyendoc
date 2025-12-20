@@ -6,6 +6,7 @@ import { ReadingPractice } from './pages/ReadingPractice';
 import { TeacherDashboard } from './pages/TeacherDashboard';
 import { AchievementsPage } from './pages/AchievementsPage';
 import { ParentDashboard } from './pages/ParentDashboard';
+import { ReportsPage } from './pages/ReportsPage';
 import { UserRole } from './types';
 import { Users, GraduationCap, Baby, Lock, X, KeyRound, ChevronRight } from 'lucide-react';
 import { playClick, playError, playSuccess } from './services/audioService';
@@ -202,7 +203,7 @@ const App: React.FC = () => {
           <Route path="/student/achievements" element={<AchievementsPage />} />
 
           <Route path="/teacher" element={<TeacherDashboard />} />
-          <Route path="/teacher/reports" element={<div className="text-center p-10 text-gray-500">Trang báo cáo đang cập nhật...</div>} />
+          <Route path="/teacher/reports" element={<ReportsPage />} />
 
           <Route path="/parent" element={<ParentDashboard />} />
           <Route path="/parent/contact" element={<div className="text-center p-10 text-gray-500">Trang liên hệ đang cập nhật...</div>} />

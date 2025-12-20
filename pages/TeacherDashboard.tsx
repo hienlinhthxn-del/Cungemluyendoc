@@ -419,26 +419,31 @@ export const TeacherDashboard: React.FC = () => {
         <div>
           <div className="flex items-center gap-3 mb-1">
             {isEditingClass ? (
-              <div className="flex items-center gap-2 animate-fade-in">
+              <div className="flex items-center gap-2 animate-fade-in bg-white p-2 rounded shadow-lg border border-blue-200">
                 <input
                   type="text"
                   value={tempClassName}
                   onChange={(e) => setTempClassName(e.target.value)}
-                  className="text-2xl font-bold text-gray-900 border border-blue-300 rounded px-2 py-1 w-48 focus:ring-2 focus:ring-primary outline-none"
+                  className="text-2xl font-bold text-primary border-b-2 border-primary outline-none px-1"
                   autoFocus
+                  placeholder="Nhập tên lớp..."
                   onKeyDown={(e) => e.key === 'Enter' && saveClassName()}
                 />
-                <button onClick={saveClassName} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors" title="Lưu">
+                <button onClick={saveClassName} className="p-2 bg-green-500 text-white rounded hover:bg-green-600 shadow-sm" title="Lưu">
                   <Check className="w-5 h-5" />
                 </button>
-                <button onClick={cancelEditingClass} className="p-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors" title="Hủy">
+                <button onClick={cancelEditingClass} className="p-2 bg-red-400 text-white rounded hover:bg-red-500 shadow-sm" title="Hủy">
                   <X className="w-5 h-5" />
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2 group cursor-pointer" onClick={startEditingClass}>
+              <div
+                className="flex items-center gap-2 group cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-colors border border-transparent hover:border-gray-300"
+                onClick={startEditingClass}
+                title="Bấm vào để đổi tên hiển thị của lớp"
+              >
                 <h1 className="text-2xl font-bold text-gray-900">Tổng Quan {className}</h1>
-                <Edit2 className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-all hover:text-primary" />
+                <Edit2 className="w-5 h-5 text-gray-400 group-hover:text-primary transition-colors" />
               </div>
             )}
           </div>
@@ -502,7 +507,10 @@ export const TeacherDashboard: React.FC = () => {
         </div>
         <div className="flex gap-3 flex-wrap">
           <button
-            onClick={() => { playClick(); setIsAddStudentOpen(true); }}
+            onClick={() => {
+              setIsAddStudentOpen(true);
+              try { playClick(); } catch (e) { }
+            }}
             className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-sm transition-all transform hover:scale-105"
           >
             <UserPlus className="w-4 h-4 mr-2" /> Thêm Học Sinh
