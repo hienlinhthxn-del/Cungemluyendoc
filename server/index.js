@@ -431,6 +431,37 @@ if (fs.existsSync(distPath)) {
     });
 }
 
+// --- MIGRATION TOOL: Fix Legacy Data ---
+// Truy cập đường link này một lần để chuyển toàn bộ HS cũ sang lớp 1A3
+app.get('/api/migrate-legacy-data', async (req, res) => {
+    try {
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(500).json({ error: 'Database not connected' });
+        }
+
+        const result = await Student.updateMany(
+            {
+                $or: [
+                    { classId: { $exists: false } },
+                    { classId: null },
+                    { classId: 'DEFAULT' }
+                ]
+            },
+            { $set: { classId: '1A3' } }
+        );
+
+        console.log(`✅ MIGRATION SUCCESS: Updated ${result.modifiedCount} students to 1A3`);
+        res.json({
+            success: true,
+            message: `Đã cập nhật thành công ${result.modifiedCount} học sinh cũ sang lớp 1A3.`,
+            details: result
+        });
+    } catch (e) {
+        console.error("Migration Failed:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 FULL SERVER running on port ${PORT}`);
 });
