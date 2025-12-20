@@ -143,6 +143,24 @@ const StudentSchema = new mongoose.Schema({
 
 const Student = mongoose.models.Student || mongoose.model('Student', StudentSchema);
 
+// --- LESSON SCHEMA & MODEL ---
+const LessonSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    week: Number,
+    title: String,
+    description: String,
+    readingText: [String],
+    phonemes: [String],
+    vocabulary: [String],
+    questions: [{
+        id: String,
+        question: String,
+        options: [String],
+        correctAnswer: String
+    }]
+});
+const Lesson = mongoose.models.Lesson || mongoose.model('Lesson', LessonSchema);
+
 
 
 // --- FILE-BASED AUDIO MAP FALLBACK (For local run without MongoDB) ---
@@ -294,6 +312,45 @@ app.post('/api/students/:id/progress', async (req, res) => {
 app.delete('/api/students/:id', async (req, res) => {
     try {
         await Student.deleteOne({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- LESSON MANAGEMENT ROUTES ---
+
+// GET All Lessons
+app.get('/api/lessons', async (req, res) => {
+    try {
+        if (mongoose.connection.readyState !== 1) return res.json([]);
+        const lessons = await Lesson.find().sort({ week: 1 });
+        res.json(lessons);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// CREATE / UPDATE Lesson
+app.post('/api/lessons', async (req, res) => {
+    try {
+        const lessonData = req.body;
+        // Upsert based on lesson ID
+        const lesson = await Lesson.findOneAndUpdate(
+            { id: lessonData.id },
+            { $set: lessonData },
+            { new: true, upsert: true }
+        );
+        res.json(lesson);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE Lesson
+app.delete('/api/lessons/:id', async (req, res) => {
+    try {
+        await Lesson.deleteOne({ id: req.params.id });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

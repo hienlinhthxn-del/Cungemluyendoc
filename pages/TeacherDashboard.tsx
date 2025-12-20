@@ -527,6 +527,12 @@ export const TeacherDashboard: React.FC = () => {
             <RefreshCw className="w-4 h-4 mr-2" /> Khôi phục Mẫu
           </button>
           <button
+            onClick={() => { playClick(); window.location.hash = '/teacher/lessons'; }}
+            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 bg-gradient-to-r hover:from-blue-50 hover:to-white transition-all duration-300"
+          >
+            <BookOpen className="w-4 h-4 mr-2" /> Quản Lý Bài Học
+          </button>
+          <button
             onClick={handleExportReport}
             className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 bg-gradient-to-r hover:from-blue-50 hover:to-white transition-all duration-300"
           >
