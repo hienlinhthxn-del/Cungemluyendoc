@@ -339,6 +339,51 @@ export const TeacherDashboard: React.FC = () => {
     window.speechSynthesis.speak(utterance);
   };
 
+  const handleExportReport = () => {
+    playClick();
+
+    // Define headers
+    const headers = ["ID", "Họ và Tên", `Điểm Tuần ${selectedWeek}`, "Tốc độ đọc", "Trạng thái"];
+
+    // Map data to rows
+    const rows = weekData.map(s => {
+      const status = s.currentScore > 0 ? "Đã nộp" : "Chưa nộp";
+      // Escape generic commas in content
+      const safeName = `"${s.name.replace(/"/g, '""')}"`;
+      const safeSpeed = `"${String(s.currentSpeed).replace(/"/g, '""')}"`;
+
+      return [
+        s.id,
+        safeName,
+        s.currentScore,
+        safeSpeed,
+        status
+      ];
+    });
+
+    // Combine headers and rows
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+
+    // Create blob and download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.setAttribute('download', `Bao_cao_Tuan_${selectedWeek}_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+
+    // Cleanup
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setNotification({
+      message: "Đã xuất báo cáo thành công!",
+      type: 'success'
+    });
+  };
+
   return (
     <div className="space-y-8 relative">
       {/* Notification Toast */}
@@ -430,8 +475,8 @@ export const TeacherDashboard: React.FC = () => {
             <RefreshCw className="w-4 h-4 mr-2" /> Khôi phục Mẫu
           </button>
           <button
-            onClick={() => playClick()}
-            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+            onClick={handleExportReport}
+            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 bg-gradient-to-r hover:from-blue-50 hover:to-white transition-all duration-300"
           >
             <Download className="w-4 h-4 mr-2" /> Xuất Báo Cáo
           </button>
