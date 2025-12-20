@@ -320,48 +320,71 @@ export const TeacherDashboard: React.FC = () => {
   const handleUpdateStudent = useCallback((editForm: EditFormState) => {
     if (!editingStudent) return;
 
-    setStudents(prev => prev.map(s => {
-      if (s.id !== editingStudent.id) {
-        return s;
+    let updatedStudents: StudentStats[] = [];
+
+    setStudents(prev => {
+      const newData = prev.map(s => {
+        if (s.id !== editingStudent.id) {
+          return s;
+        }
+
+        // Update specific week history
+        const historyExists = s.history.some(h => h.week === selectedWeek);
+        const updatedHistory = historyExists
+          ? s.history.map(h =>
+            h.week === selectedWeek
+              ? {
+                ...h,
+                score: Number(editForm.score),
+                speed: editForm.speed,
+                readingScore: editForm.readingScore,
+                wordScore: editForm.wordScore,
+                sentenceScore: editForm.sentenceScore,
+                exerciseScore: editForm.exerciseScore
+              }
+              : h
+          )
+          : [...s.history, {
+            week: selectedWeek,
+            score: Number(editForm.score),
+            speed: editForm.speed,
+            readingScore: editForm.readingScore,
+            wordScore: editForm.wordScore,
+            sentenceScore: editForm.sentenceScore,
+            exerciseScore: editForm.exerciseScore
+          }];
+
+        return {
+          ...s,
+          name: editForm.name,
+          completedLessons: Number(editForm.completedLessons),
+          history: updatedHistory,
+          // Update top-level stats if it's the latest week
+          averageScore: selectedWeek === 18 ? Number(editForm.score) : s.averageScore,
+          readingSpeed: selectedWeek === 18 ? editForm.speed : s.readingSpeed
+        };
+      });
+
+      updatedStudents = newData;
+      return newData;
+    });
+
+    // Save to LocalStorage immediately
+    // We use a timeout to ensure state hook has fired, or just use the computed variable 'updatedStudents'
+    if (updatedStudents.length > 0) {
+      localStorage.setItem('app_students_data', JSON.stringify(updatedStudents));
+
+      // Sync to Server (Optimistic)
+      // We find the updated student and send it
+      const updatedStudent = updatedStudents.find(s => s.id === editingStudent.id);
+      if (updatedStudent) {
+        fetch(`/api/students/${updatedStudent.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedStudent)
+        }).catch(console.error);
       }
-
-      // Update specific week history
-      const historyExists = s.history.some(h => h.week === selectedWeek);
-      const updatedHistory = historyExists
-        ? s.history.map(h =>
-          h.week === selectedWeek
-            ? {
-              ...h,
-              score: Number(editForm.score),
-              speed: editForm.speed,
-              readingScore: editForm.readingScore,
-              wordScore: editForm.wordScore,
-              sentenceScore: editForm.sentenceScore,
-              exerciseScore: editForm.exerciseScore
-            }
-            : h
-        )
-        : [...s.history, {
-          week: selectedWeek,
-          score: Number(editForm.score),
-          speed: editForm.speed,
-          readingScore: editForm.readingScore,
-          wordScore: editForm.wordScore,
-          sentenceScore: editForm.sentenceScore,
-          exerciseScore: editForm.exerciseScore
-        }];
-
-      return {
-        ...s,
-        name: editForm.name,
-        completedLessons: Number(editForm.completedLessons),
-        history: updatedHistory,
-        // Update top-level stats if it's the latest week (assuming 13 is the latest)
-        // Update top-level stats if it's the latest week
-        averageScore: selectedWeek === 18 ? Number(editForm.score) : s.averageScore,
-        readingSpeed: selectedWeek === 18 ? editForm.speed : s.readingSpeed
-      };
-    }));
+    }
 
     setIsEditModalOpen(false);
     setEditingStudent(null);

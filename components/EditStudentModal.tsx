@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 import { StudentStats } from '../types';
 
 interface EditStudentModalProps {
@@ -135,6 +135,13 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ isOpen, onCl
                             <label className="block text-sm font-medium text-gray-700 mb-1">Tốc độ đọc</label>
                             <input type="text" value={editForm.speed} onChange={(e) => setEditForm({ ...editForm, speed: e.target.value })} placeholder="VD: 40 hoặc 'Đánh vần'" className="w-full border border-gray-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-primary" />
                         </div>
+
+                        <button
+                            onClick={() => onUpdate(editForm)}
+                            className="w-full mt-3 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 shadow-sm transition-colors"
+                        >
+                            <Save className="w-4 h-4" /> Lưu Điểm & Đóng
+                        </button>
                     </div>
                     <div className="flex justify-end gap-3 mt-6">
                         <button onClick={onClose} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Hủy bỏ</button>
