@@ -32,9 +32,19 @@ export const TeacherDashboard: React.FC = () => {
 
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Class ID State
+  const [classId, setClassId] = useState(() => localStorage.getItem('teacher_class_id') || 'DEFAULT');
+
+  const handleClassIdChange = async (newClassId: string) => {
+    setClassId(newClassId);
+    localStorage.setItem('teacher_class_id', newClassId);
+    setNotification({ message: `Đang chuyển sang lớp ${newClassId}...`, type: 'success' });
+    await syncWithServer(newClassId); // Sync immediately
+  };
+
   const handleSync = async () => {
     setIsSyncing(true);
-    await syncWithServer();
+    await syncWithServer(classId);
     setTimeout(() => setIsSyncing(false), 800);
   };
 
@@ -51,10 +61,10 @@ export const TeacherDashboard: React.FC = () => {
     window.addEventListener('students_updated', loadData);
 
     // Initial Sync with Server
-    syncWithServer();
+    syncWithServer(classId);
 
     return () => window.removeEventListener('students_updated', loadData);
-  }, []);
+  }, [classId]);
 
   // Add Student Modal State
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
@@ -159,6 +169,7 @@ export const TeacherDashboard: React.FC = () => {
     const newStudent: StudentStats = {
       id: `s${Date.now()}`,
       name: newStudentName,
+      classId: classId, // Assign current class ID
       completedLessons: 0,
       averageScore: 0,
       readingSpeed: 0,
@@ -430,6 +441,18 @@ export const TeacherDashboard: React.FC = () => {
                 <Edit2 className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-all hover:text-primary" />
               </div>
             )}
+          </div>
+
+          <div className="flex items-center gap-4 mb-2">
+            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">
+              <span className="text-xs font-bold text-gray-500 uppercase">Mã Lớp:</span>
+              <input
+                value={classId}
+                onChange={(e) => handleClassIdChange(e.target.value)}
+                className="bg-transparent border-b border-gray-300 w-24 text-sm font-bold text-primary focus:outline-none focus:border-primary"
+                title="Nhập mã lớp để chuyển đổi dữ liệu"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

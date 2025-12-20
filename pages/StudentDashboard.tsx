@@ -1,14 +1,18 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { LESSONS, MOCK_STUDENTS } from '../constants';
 import { Link } from 'react-router-dom';
-import { BookOpen, Star, ChevronRight, RotateCcw, Bell, User } from 'lucide-react';
+import { BookOpen, Star, ChevronRight, RotateCcw, Bell, User, School } from 'lucide-react';
 import { playClick } from '../services/audioService';
 import { getCommunications, Communication, saveCommunication } from '../services/communicationService';
 import { StudentStats } from '../types';
 
-import { getStudents } from '../services/studentService';
+import { getStudents, syncWithServer } from '../services/studentService';
 
 export const StudentDashboard: React.FC = () => {
+  // Class ID State
+  const [classId, setClassId] = useState<string | null>(() => localStorage.getItem('student_class_id'));
+  const [classInput, setClassInput] = useState('');
+
   // Load students from service
   const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
 
@@ -19,15 +23,31 @@ export const StudentDashboard: React.FC = () => {
     return currentStudents.find(s => s.id === savedId) || null;
   });
 
-  // Reload data when component mounts to ensure we have latest achievements
+  // Reload data when component mounts or Class ID changes
   useEffect(() => {
-    setStudents(getStudents());
+    if (classId) {
+      // Sync specific class data
+      syncWithServer(classId).then(() => {
+        setStudents(getStudents());
+      });
+    } else {
+      setStudents(getStudents());
+    }
+
     if (selectedStudent) {
       // Refresh selected student data too
       const freshData = getStudents().find(s => s.id === selectedStudent.id);
       if (freshData) setSelectedStudent(freshData);
     }
-  }, []);
+  }, [classId]);
+
+  const handleClassSubmit = () => {
+    if (classInput.trim()) {
+      playClick();
+      localStorage.setItem('student_class_id', classInput.trim());
+      setClassId(classInput.trim());
+    }
+  };
 
   const handleSelectStudent = (student: StudentStats) => {
     playClick();
@@ -39,10 +59,16 @@ export const StudentDashboard: React.FC = () => {
     setSelectedStudent(null);
     localStorage.removeItem('current_student_id');
   };
+
+  const handleExitClass = () => {
+    if (window.confirm("Bạn muốn thoát khỏi lớp này?")) {
+      localStorage.removeItem('student_class_id');
+      setClassId(null);
+      setSelectedStudent(null);
+    }
+  }
+
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Notifications State
-
 
   // Filter similar to parent dashboard
   const filteredStudents = useMemo(() => students.filter(s =>
@@ -73,7 +99,6 @@ export const StudentDashboard: React.FC = () => {
   useEffect(() => {
     const loadHomeworks = () => {
       const allComms = getCommunications();
-      // Filter for unread homework assigned to this student or broadcast
       const homeworks = allComms.filter(c =>
         c.type === 'HOMEWORK' &&
         (c.studentId === selectedStudent?.id || !c.studentId) &&
@@ -84,7 +109,6 @@ export const StudentDashboard: React.FC = () => {
 
     loadHomeworks();
     window.addEventListener('communications_updated', loadHomeworks);
-    // Also listen to storage events for cross-tab syncing if needed, though communications_updated covers same-tab
     window.addEventListener('storage', loadHomeworks);
 
     return () => {
@@ -93,13 +117,51 @@ export const StudentDashboard: React.FC = () => {
     };
   }, [selectedStudent]);
 
+  // SCREEN 1: CLASS SELECTION
+  if (!classId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center space-y-6 animate-fade-in-up">
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto text-blue-600 mb-4">
+            <School className="w-10 h-10" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-800">Chào Mừng Bé!</h1>
+          <p className="text-gray-500">Nhập Mã Lớp cô giáo đưa để vào lớp nhé.</p>
 
+          <input
+            type="text"
+            placeholder="Ví dụ: 1A3"
+            className="w-full text-center text-2xl font-bold py-4 border-2 border-blue-100 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-200 outline-none transition-all uppercase placeholder:text-gray-300 placeholder:normal-case placeholder:font-normal"
+            value={classInput}
+            onChange={(e) => setClassInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleClassSubmit()}
+          />
 
+          <button
+            onClick={handleClassSubmit}
+            disabled={!classInput}
+            className="w-full py-4 bg-primary text-white text-xl font-bold rounded-xl hover:bg-blue-600 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Vào Lớp Ngay 🚀
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN 2: STUDENT SELECTION
   if (!selectedStudent) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up relative">
+        <button
+          onClick={handleExitClass}
+          className="absolute top-0 right-0 text-sm text-gray-400 hover:text-red-500 underline"
+        >
+          Thoát lớp {classId}
+        </button>
+
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-blue-900 mb-2">Chào bạn nhỏ! Bạn tên là gì?</h1>
+          <h1 className="text-3xl font-bold text-blue-900 mb-2">Chào bạn nhỏ lớp {classId}!</h1>
           <p className="text-gray-500">Chọn tên của mình để bắt đầu học nhé</p>
         </div>
 
@@ -128,7 +190,7 @@ export const StudentDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="font-bold text-gray-800 group-hover:text-primary transition-colors">{student.name}</p>
-                <p className="text-xs text-gray-500">Lớp 1A3</p>
+                <p className="text-xs text-gray-500">Lớp {classId}</p>
               </div>
             </button>
           ))}
@@ -136,7 +198,11 @@ export const StudentDashboard: React.FC = () => {
 
         {filteredStudents.length === 0 && (
           <div className="text-center text-gray-500 mt-10">
-            Không tìm thấy bạn nào tên "{searchTerm}"
+            Không tìm thấy bạn nào tên "{searchTerm}" trong lớp {classId}.
+            <br />
+            <button onClick={() => syncWithServer(classId).then(() => setStudents(getStudents()))} className="text-primary underline mt-2">
+              Thử tải lại danh sách
+            </button>
           </div>
         )}
       </div>

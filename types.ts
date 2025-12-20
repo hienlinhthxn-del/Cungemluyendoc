@@ -44,6 +44,7 @@ export interface WeeklyStats {
 export interface StudentStats {
   id: string;
   name: string;
+  classId?: string; // Optional class ID for grouping
   completedLessons: number;
   averageScore: number; // calculated or latest
   readingSpeed?: string | number; // latest

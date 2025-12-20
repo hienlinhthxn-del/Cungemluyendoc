@@ -30,15 +30,17 @@ export const getStudents = (): StudentStats[] => {
 };
 
 // NEW: Force sync with server (Call this from Dashboard)
-// NEW: Force sync with server (Call this from Dashboard)
-export const syncWithServer = async () => {
+export const syncWithServer = async (classId?: string) => {
     try {
-        const response = await fetch('/api/students');
+        const url = classId ? `/api/students?classId=${classId}` : '/api/students';
+        const response = await fetch(url);
         if (!response.ok) throw new Error('Failed to fetch from server');
 
         const serverData: StudentStats[] = await response.json();
 
-        if (Array.isArray(serverData) && serverData.length > 0) {
+        if (Array.isArray(serverData)) {
+            // If classId is provided, we treat the server list as the authority for that class.
+            // However, to keep it simple, we will merge with local for preservation of unsynced audios.
             console.log("Syncing: Server has data, updating local...");
 
             const localStudents = getStudents();
@@ -65,6 +67,8 @@ export const syncWithServer = async () => {
             });
 
             // Save merged list
+            // If filtering by classId, this overwrites everything with just that class.
+            // This is acceptable behavior for "Switching Classes".
             localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(finalStudents));
             window.dispatchEvent(new Event('students_updated'));
         }
@@ -73,7 +77,7 @@ export const syncWithServer = async () => {
     }
 };
 
-const syncStudentToServer = async (student: StudentStats) => {
+export const syncStudentToServer = async (student: StudentStats) => {
     try {
         await fetch('/api/students', {
             method: 'POST',
@@ -81,6 +85,7 @@ const syncStudentToServer = async (student: StudentStats) => {
             body: JSON.stringify({
                 id: student.id,
                 name: student.name,
+                classId: student.classId,
                 completedLessons: student.completedLessons,
                 averageScore: student.averageScore,
                 readingSpeed: student.readingSpeed,
@@ -155,7 +160,11 @@ export const saveStudentResult = async (studentId: string, week: number, score: 
             await fetch('/api/students', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: student.id, name: student.name })
+                body: JSON.stringify({
+                    id: student.id,
+                    name: student.name,
+                    classId: student.classId
+                })
             });
 
             // Then save progress with audioUrl
@@ -186,7 +195,7 @@ export const initializeStudentsIfEmpty = async () => {
         window.dispatchEvent(new Event('students_updated'));
     }
 
-    // Try to sync/merge on startup
+    // Try to sync/merge on startup (without classId initially, behaves as default)
     syncWithServer();
 };
 

@@ -126,6 +126,7 @@ const LessonAudio = mongoose.model('LessonAudio', LessonAudioSchema);
 // --- 3. STUDENT & SCORE MANAGEMENT (MONGODB) ---
 const StudentSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
+    classId: { type: String, required: false, default: 'DEFAULT' }, // NEW: Class ID
     name: { type: String, required: true },
     completedLessons: { type: Number, default: 0 },
     averageScore: { type: Number, default: 0 },
@@ -141,6 +142,8 @@ const StudentSchema = new mongoose.Schema({
 });
 
 const Student = mongoose.models.Student || mongoose.model('Student', StudentSchema);
+
+
 
 // --- FILE-BASED AUDIO MAP FALLBACK (For local run without MongoDB) ---
 const AUDIO_MAP_FILE = path.join(__dirname, 'audio-map.json');
@@ -191,14 +194,18 @@ app.post('/api/upload-student-audio', uploadMiddleware, (req, res) => {
     }
 });
 
-// GET All Students
+// GET All Students (Filtered by ClassId)
 app.get('/api/students', async (req, res) => {
     try {
         if (mongoose.connection.readyState !== 1) {
             // Fallback if DB not connected
             return res.json([]);
         }
-        const students = await Student.find().sort({ lastPractice: -1 });
+
+        const classId = req.query.classId;
+        const filter = classId ? { classId } : {};
+
+        const students = await Student.find(filter).sort({ lastPractice: -1 });
         res.json(students);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -208,10 +215,11 @@ app.get('/api/students', async (req, res) => {
 // CREATE / SYNC Student
 app.post('/api/students', async (req, res) => {
     try {
-        const { id, name, completedLessons, averageScore, readingSpeed, history, badges } = req.body;
+        const { id, name, classId, completedLessons, averageScore, readingSpeed, history, badges } = req.body;
 
         // Prepare update data. undefined fields won't overwrite existing unless specified.
         const updateData = { name };
+        if (classId !== undefined) updateData.classId = classId;
         if (completedLessons !== undefined) updateData.completedLessons = completedLessons;
         if (averageScore !== undefined) updateData.averageScore = averageScore;
         if (readingSpeed !== undefined) updateData.readingSpeed = readingSpeed;
