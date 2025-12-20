@@ -304,10 +304,31 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteStudent = (id: string, name: string) => {
+  const handleDeleteStudent = async (id: string, name: string) => {
     playClick();
     if (window.confirm(`Bạn có chắc chắn muốn xóa học sinh ${name} khỏi lớp không?`)) {
-      setStudents(prev => prev.filter(s => s.id !== id));
+      // 1. Update State
+      let newStudents: StudentStats[] = [];
+      setStudents(prev => {
+        newStudents = prev.filter(s => s.id !== id);
+        return newStudents;
+      });
+
+      // 2. Update LocalStorage
+      localStorage.setItem('app_students_data', JSON.stringify(newStudents));
+
+      // 3. Sync to Server
+      try {
+        const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          setNotification({ message: `Đã xóa học sinh ${name}`, type: 'success' });
+        } else {
+          console.error("Server delete failed");
+          // Optional: Revert? For now, we assume success or user retries.
+        }
+      } catch (err) {
+        console.error("Network error deleting student:", err);
+      }
     }
   };
 
@@ -378,8 +399,8 @@ export const TeacherDashboard: React.FC = () => {
       // We find the updated student and send it
       const updatedStudent = updatedStudents.find(s => s.id === editingStudent.id);
       if (updatedStudent) {
-        fetch(`/api/students/${updatedStudent.id}`, {
-          method: 'PUT',
+        fetch('/api/students', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedStudent)
         }).catch(console.error);
