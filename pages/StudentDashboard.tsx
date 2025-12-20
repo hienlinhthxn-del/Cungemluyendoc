@@ -1,5 +1,7 @@
 import React, { useRef, useState, useMemo, useEffect } from 'react';
-import { LESSONS, MOCK_STUDENTS } from '../constants';
+import { LESSONS as DEFAULT_LESSONS, MOCK_STUDENTS } from '../constants';
+import { getLessons } from '../services/lessonService';
+import { Lesson } from '../types';
 import { Link } from 'react-router-dom';
 import { BookOpen, Star, ChevronRight, RotateCcw, Bell, User, School, Trophy } from 'lucide-react';
 import { playClick } from '../services/audioService';
@@ -15,6 +17,15 @@ export const StudentDashboard: React.FC = () => {
 
   // Load students from service
   const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
+
+  // Dynamic Lessons
+  const [allLessons, setAllLessons] = useState<Lesson[]>(DEFAULT_LESSONS);
+
+  useEffect(() => {
+    getLessons().then(data => {
+      if (data && data.length > 0) setAllLessons(data);
+    });
+  }, []);
 
   // Student Selection State
   const [selectedStudent, setSelectedStudent] = useState<StudentStats | null>(() => {
@@ -282,7 +293,7 @@ export const StudentDashboard: React.FC = () => {
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...LESSONS].sort((a, b) => a.week - b.week).map((lesson, index) => {
+          {[...allLessons].sort((a, b) => a.week - b.week).map((lesson, index) => {
             // Determine completion based on index vs completed count
             const isCompleted = index < currentStudent.completedLessons;
 

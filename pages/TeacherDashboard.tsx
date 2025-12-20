@@ -66,6 +66,11 @@ export const TeacherDashboard: React.FC = () => {
   const handleSync = async () => {
     setIsSyncing(true);
     await syncWithServer(classId);
+
+    // Also refresh lessons in case user just added one
+    const lessons = await getLessons();
+    if (lessons.length > 0) setAllLessons(lessons);
+
     setTimeout(() => setIsSyncing(false), 800);
   };
 
