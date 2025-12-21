@@ -544,34 +544,108 @@ app.get('/api/test-cloudinary', async (req, res) => {
 });
 
 
-// --- MIGRATION TOOL: Fix Legacy Data ---
-// Truy cập đường link này một lần để chuyển toàn bộ HS cũ sang lớp 1A3
-app.get('/api/migrate-legacy-data', async (req, res) => {
+// --- 5. DATA RECOVERY (Restore DB from Cloudinary Files) ---
+app.post('/api/admin/recover-from-cloud', async (req, res) => {
     try {
-        if (mongoose.connection.readyState !== 1) {
-            return res.status(500).json({ error: 'Database not connected' });
+        if (!process.env.CLOUDINARY_CLOUD_NAME) {
+            return res.status(400).json({ error: 'Cloudinary not configured' });
         }
 
-        const result = await Student.updateMany(
-            {
-                $or: [
-                    { classId: { $exists: false } },
-                    { classId: null },
-                    { classId: 'DEFAULT' }
-                ]
-            },
-            { $set: { classId: '1A3' } }
-        );
+        console.log("🔄 STARTING RECOVERY from Cloudinary...");
 
-        console.log(`✅ MIGRATION SUCCESS: Updated ${result.modifiedCount} students to 1A3`);
+        // 1. Fetch all files from Cloudinary "reading-app-audio" folder
+        // Note: exact syntax depends on Cloudinary version, using search api is best but might need enabled.
+        // We will try using the listing resource api.
+        let resources = [];
+        let nextCursor = null;
+
+        do {
+            const result = await cloudinary.api.resources({
+                type: 'upload',
+                prefix: 'reading-app-audio/', // Folder prefix
+                max_results: 500,
+                next_cursor: nextCursor
+            });
+            resources = [...resources, ...result.resources];
+            nextCursor = result.next_cursor;
+        } while (nextCursor);
+
+        console.log(`📂 Found ${resources.length} files on Cloudinary.`);
+
+        let restoredCount = 0;
+        let errors = [];
+
+        // 2. Loop through files and match to students
+        for (const file of resources) {
+            // Filename format: "reading-app-audio/student_ID_wWEEK.EXT"
+            // e.g. "reading-app-audio/student_s123456789_w14.webm"
+            // or just the public_id depending on how it's returned
+
+            const publicId = file.public_id; // "reading-app-audio/student_s123456789_w14"
+            const parts = publicId.split('/').pop().split('_');
+
+            // Expected parts: ["student", "s123456789", "w14"]
+            if (parts.length >= 3 && parts[0] === 'student') {
+                const studentId = parts[1];
+                const weekStr = parts[2]; // "w14"
+                const week = parseInt(weekStr.replace('w', ''));
+
+                if (!studentId || isNaN(week)) continue;
+
+                // Construct HTTPS URL
+                const audioUrl = file.secure_url;
+
+                // 3. Find or Create Student
+                let student = await Student.findOne({ id: studentId });
+
+                if (!student) {
+                    // Create minimal skeleton if missing
+                    student = new Student({
+                        id: studentId,
+                        name: `Học sinh (Khôi phục ${studentId.substr(-4)})`, // Temporary name
+                        classId: 'RECOVERED',
+                        completedLessons: 0,
+                        averageScore: 0,
+                        history: []
+                    });
+                    console.log(`➕ Created missing student: ${studentId}`);
+                }
+
+                // 4. Update History
+                const historyIndex = student.history.findIndex(h => h.week === week);
+                if (historyIndex === -1) {
+                    // Add new record
+                    student.history.push({
+                        week: week,
+                        score: 0, // Unknown score, mark as 0 or 100?
+                        speed: 0,
+                        audioUrl: audioUrl
+                    });
+                    restoredCount++;
+                } else if (!student.history[historyIndex].audioUrl) {
+                    // Link broken, restore it
+                    student.history[historyIndex].audioUrl = audioUrl;
+                    restoredCount++;
+                }
+
+                // Recalculate stats
+                student.completedLessons = student.history.length;
+
+                await student.save();
+            }
+        }
+
+        console.log(`✅ Recovery Complete. Restored/Linked ${restoredCount} items.`);
         res.json({
             success: true,
-            message: `Đã cập nhật thành công ${result.modifiedCount} học sinh cũ sang lớp 1A3.`,
-            details: result
+            totalFiles: resources.length,
+            restoredCount: restoredCount,
+            message: `Tìm thấy ${resources.length} file. Đã khôi phục liên kết cho ${restoredCount} bài đọc.`
         });
-    } catch (e) {
-        console.error("Migration Failed:", e);
-        res.status(500).json({ error: e.message });
+
+    } catch (error) {
+        console.error("Recovery Error:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 

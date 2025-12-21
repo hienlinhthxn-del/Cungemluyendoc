@@ -665,6 +665,29 @@ export const TeacherDashboard: React.FC = () => {
           >
             <Settings className="w-5 h-5" />
           </button>
+
+          <button
+            onClick={async () => {
+              if (!window.confirm("Bạn có muốn quét Cloudinary để khôi phục các bài đọc bị mất link không?")) return;
+              setNotification({ message: "Đang quét và khôi phục dữ liệu...", type: 'success' });
+              try {
+                const res = await fetch('/api/admin/recover-from-cloud', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                  setNotification({ message: data.message, type: 'success' });
+                  await syncWithServer(classId); // Refresh list
+                } else {
+                  setNotification({ message: "Lỗi: " + data.error, type: 'error' });
+                }
+              } catch (e) {
+                setNotification({ message: "Lỗi kết nối server", type: 'error' });
+              }
+            }}
+            className="p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors"
+            title="Khôi phục dữ liệu từ Cloudinary"
+          >
+            <RefreshCw className="w-5 h-5 animate-spin-slow" />
+          </button>
         </div>
       </div>
 
