@@ -27,224 +27,110 @@ console.log("-----------------------------------------");
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// --- 1. DATABASE CONNECTION ---
+// --- 1. DATABASE & PERSISTENCE ---
+
+// In-Memory Database (Synced to Cloudinary)
+let localStudents = [];
+const DB_FILE = 'reading_app_db.json';
+const CLOUD_DB_PUBLIC_ID = 'reading_app_db_backup.json';
+
+// Helper: Save DB to Cloudinary (Debounced)
+let saveTimeout = null;
+const saveDBToCloud = () => {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(async () => {
+        if (!upload) return;
+        try {
+            console.log("☁️ Syncing Database to Cloudinary...");
+            const jsonString = JSON.stringify(localStudents, null, 2);
+            // We use a data URI or temp file. Multer is for incoming requests, here we use direct upload.
+            // But we can upload raw string as buffer? 
+            // Better: Write to temp file then upload
+            const tempPath = path.join(__dirname, 'temp_db.json');
+            fs.writeFileSync(tempPath, jsonString);
+
+            await cloudinary.uploader.upload(tempPath, {
+                resource_type: 'raw',
+                public_id: CLOUD_DB_PUBLIC_ID,
+                overwrite: true,
+                invalidate: true
+            });
+            console.log("✅ Database Synced to Cloudinary!");
+            fs.unlinkSync(tempPath);
+        } catch (e) {
+            console.error("❌ Failed to sync DB to Cloud:", e.message);
+        }
+    }, 5000); // Debounce 5s
+};
+
+// Helper: Load DB from Cloudinary
+const loadDBFromCloud = async () => {
+    if (!upload) return;
+    try {
+        console.log("☁️ Fetching Database from Cloudinary...");
+        // Get the URL
+        const url = cloudinary.url(CLOUD_DB_PUBLIC_ID, { resource_type: 'raw' });
+        // Fetch it
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                localStudents = data;
+                console.log(`✅ Loaded ${localStudents.length} students from Cloud Backup.`);
+            }
+        } else {
+            console.log("⚠️ No Cloud Database found (First run?), starting empty.");
+        }
+    } catch (e) {
+        console.warn("⚠️ Could not load Cloud DB:", e.message);
+    }
+};
+
 const connectDB = async () => {
     try {
-        const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/reading-app';
-        if (!process.env.MONGODB_URI) {
-            console.warn("⚠️ MONGODB_URI missing in .env. Trying local default:", uri);
+        const uri = process.env.MONGODB_URI;
+        if (uri) {
+            await mongoose.connect(uri);
+            console.log("✅ MongoDB Connected Successfully!");
+        } else {
+            console.warn("⚠️ MONGODB_URI missing. ACTIVATING CLOUDINARY-DB MODE.");
+            // If Cloudinary configured, try to load data
+            if (process.env.CLOUDINARY_CLOUD_NAME) {
+                await loadDBFromCloud();
+            }
         }
-
-        await mongoose.connect(uri);
-        console.log("✅ MongoDB Connected Successfully!");
     } catch (error) {
         console.error("❌ MongoDB Connection Error:", error);
     }
 };
 connectDB();
 
-// --- 2. CLOUDINARY CONFIG ---
-// Only config if ALL credentials exist
-let upload = null;
-const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-const apiKey = process.env.CLOUDINARY_API_KEY;
-const apiSecret = process.env.CLOUDINARY_API_SECRET;
+// --- API ROUTES (ADAPTED FOR DUAL MODE) ---
 
-if (cloudName && apiKey && apiSecret) {
-    cloudinary.config({
-        cloud_name: cloudName.trim(),
-        api_key: apiKey.trim(),
-        api_secret: apiSecret.trim()
-    });
-
-    const storage = new CloudinaryStorage({
-        cloudinary: cloudinary,
-        params: {
-            folder: 'reading-app-audio',
-            resource_type: 'auto',
-            format: async (req, file) => {
-                // Keep original extension or fallback
-                return file.originalname.split('.').pop() || 'webm';
-            },
-        },
-    });
-    upload = multer({ storage: storage });
-    console.log("✅ Cloudinary Configured!");
-} else {
-    console.warn("⚠️ Cloudinary credentials missing. Switching to Local Disk Storage.");
-
-    // Create uploads directory if it doesn't exist
-    const uploadDir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    const storage = multer.diskStorage({
-        destination: function (req, file, cb) {
-            cb(null, uploadDir)
-        },
-        filename: function (req, file, cb) {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-            // Get extension from original name or default to webm
-            const ext = file.originalname.split('.').pop() || 'webm';
-            cb(null, file.fieldname + '-' + uniqueSuffix + '.' + ext)
-        }
-    });
-
-    upload = multer({ storage: storage });
-}
-
-// Serve uploads folder statically so frontend can access them
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// --- 3. MIDDLEWARE ---
-app.use(cors());
-app.use(express.json());
-
-// Upload Middleware wrapper to catch Multer/Cloudinary errors
-const uploadMiddleware = (req, res, next) => {
-    if (!upload) {
-        return res.status(500).json({ error: 'Cloudinary not configured on server' });
-    }
-    const uploader = upload.single('audioFile');
-    uploader(req, res, (err) => {
-        if (err) {
-            console.error("❌ Upload Middleware Error:", err);
-            return res.status(500).json({
-                error: 'Upload Failed',
-                details: err.message
-            });
-        }
-        next();
-    });
-};
-
-// --- 4. DATA MODELS (Quick inline schema) ---
-const LessonAudioSchema = new mongoose.Schema({
-    lessonId: String,
-    text: String,
-    audioUrl: String,
-    createdAt: { type: Date, default: Date.now }
-});
-const LessonAudio = mongoose.model('LessonAudio', LessonAudioSchema);
-
-// --- 3. STUDENT & SCORE MANAGEMENT (MONGODB) ---
-const StudentSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    classId: { type: String, required: false, default: 'DEFAULT' }, // NEW: Class ID
-    name: { type: String, required: true },
-    completedLessons: { type: Number, default: 0 },
-    averageScore: { type: Number, default: 0 },
-    readingSpeed: { type: mongoose.Schema.Types.Mixed, default: 0 }, // Number or string
-    history: [{
-        week: Number,
-        score: Number,
-        speed: mongoose.Schema.Types.Mixed,
-        audioUrl: String // New field for recording
-    }],
-    badges: [String],
-    lastPractice: { type: Date, default: Date.now }
-});
-
-const Student = mongoose.models.Student || mongoose.model('Student', StudentSchema);
-
-// --- LESSON SCHEMA & MODEL ---
-const LessonSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    week: Number,
-    title: String,
-    description: String,
-    readingText: [String],
-    phonemes: [String],
-    vocabulary: [String],
-    questions: [{
-        id: String,
-        question: String,
-        options: [String],
-        correctAnswer: String
-    }]
-});
-const Lesson = mongoose.models.Lesson || mongoose.model('Lesson', LessonSchema);
-
-
-
-// --- FILE-BASED AUDIO MAP FALLBACK (For local run without MongoDB) ---
-const AUDIO_MAP_FILE = path.join(__dirname, 'audio-map.json');
-
-const loadAudioMap = () => {
-    if (fs.existsSync(AUDIO_MAP_FILE)) {
-        try {
-            return JSON.parse(fs.readFileSync(AUDIO_MAP_FILE, 'utf8'));
-        } catch (e) {
-            console.error("Error reading audio-map.json:", e);
-            return {};
-        }
-    }
-    return {};
-};
-
-const saveAudioMap = (data) => {
-    try {
-        fs.writeFileSync(AUDIO_MAP_FILE, JSON.stringify(data, null, 2), 'utf8');
-    } catch (e) {
-        console.error("Error writing audio-map.json:", e);
-    }
-};
-
-// --- 5. API ROUTES ---
-
-// UPLOAD STUDENT AUDIO
-app.post('/api/upload-student-audio', uploadMiddleware, (req, res) => {
-    if (req.file) {
-        // Cloudinary/Multer usually puts the URL in 'path' or 'secure_url'
-        let fileUrl = req.file.secure_url || req.file.path; // Try secure_url first (HTTPS), then path
-
-        // Force HTTPS for Cloudinary URLs to prevent Mixed Content errors on Render
-        if (fileUrl && fileUrl.startsWith('http:') && fileUrl.includes('cloudinary.com')) {
-            fileUrl = fileUrl.replace('http:', 'https:');
-        }
-
-        // If we are using local disk storage (fallback), req.file.path is a system path.
-        if (!process.env.CLOUDINARY_CLOUD_NAME) {
-            const filename = req.file.filename;
-            fileUrl = `/uploads/${filename}`;
-        }
-
-        console.log("✅ File uploaded, URL:", fileUrl);
-        res.json({ url: fileUrl });
-    } else {
-        res.status(400).json({ error: 'No audio file uploaded' });
-    }
-});
-
-// GET All Students (Filtered by ClassId)
+// GET All Students
 app.get('/api/students', async (req, res) => {
     try {
-        if (mongoose.connection.readyState !== 1) {
-            // Fallback if DB not connected
-            return res.json([]);
-        }
-
-        const classId = req.query.classId;
-        let filter = {};
-
-        if (classId) {
-            if (classId === 'DEFAULT') {
-                // Legacy support: 'DEFAULT' class includes students with no classId assigned yet
-                filter = {
-                    $or: [
-                        { classId: 'DEFAULT' },
-                        { classId: { $exists: false } }, // Old records
-                        { classId: null }
-                    ]
-                };
-            } else {
-                filter = { classId };
+        if (mongoose.connection.readyState === 1) {
+            const classId = req.query.classId;
+            let filter = {};
+            if (classId) {
+                if (classId === 'DEFAULT') {
+                    filter = { $or: [{ classId: 'DEFAULT' }, { classId: { $exists: false } }, { classId: null }] };
+                } else {
+                    filter = { classId };
+                }
             }
+            const students = await Student.find(filter).sort({ lastPractice: -1 });
+            return res.json(students);
         }
 
-        const students = await Student.find(filter).sort({ lastPractice: -1 });
-        res.json(students);
+        // Fallback: Return Local Data
+        let filtered = localStudents;
+        const classId = req.query.classId;
+        if (classId && classId !== 'DEFAULT') {
+            filtered = localStudents.filter(s => s.classId === classId);
+        }
+        res.json(filtered);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -253,26 +139,35 @@ app.get('/api/students', async (req, res) => {
 // CREATE / SYNC Student
 app.post('/api/students', async (req, res) => {
     try {
-        const { id, name, classId, completedLessons, averageScore, readingSpeed, history, badges } = req.body;
+        const data = req.body;
 
-        // Prepare update data. undefined fields won't overwrite existing unless specified.
-        const updateData = { name };
-        if (classId !== undefined) updateData.classId = classId;
-        if (completedLessons !== undefined) updateData.completedLessons = completedLessons;
-        if (averageScore !== undefined) updateData.averageScore = averageScore;
-        if (readingSpeed !== undefined) updateData.readingSpeed = readingSpeed;
-        if (history !== undefined) updateData.history = history;
-        if (badges !== undefined) updateData.badges = badges;
+        if (mongoose.connection.readyState === 1) {
+            // ... MongoDB Logic (Same as before but specific fields)
+            const updateData = { ...data };
+            delete updateData.id;
+            const student = await Student.findOneAndUpdate(
+                { id: data.id },
+                {
+                    $set: updateData,
+                    $setOnInsert: { lastPractice: new Date() }
+                },
+                { new: true, upsert: true }
+            );
+            return res.json(student);
+        }
 
-        const student = await Student.findOneAndUpdate(
-            { id: id },
-            {
-                $set: updateData,
-                $setOnInsert: { lastPractice: new Date() }
-            },
-            { new: true, upsert: true }
-        );
-        res.json(student);
+        // Fallback: Update Local Data
+        const idx = localStudents.findIndex(s => s.id === data.id);
+        if (idx >= 0) {
+            // Merge updates
+            localStudents[idx] = { ...localStudents[idx], ...data, lastPractice: new Date() };
+        } else {
+            localStudents.push({ ...data, lastPractice: new Date(), history: data.history || [] });
+        }
+
+        saveDBToCloud(); // Trigger Sync
+        res.json(localStudents.find(s => s.id === data.id));
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -284,30 +179,56 @@ app.post('/api/students/:id/progress', async (req, res) => {
         const { id } = req.params;
         const { score, speed, week, lessonTitle, audioUrl } = req.body;
 
-        const student = await Student.findOne({ id });
-        if (!student) return res.status(404).json({ error: 'Student not found' });
+        if (mongoose.connection.readyState === 1) {
+            const student = await Student.findOne({ id });
+            if (!student) return res.status(404).json({ error: 'Student not found' });
 
-        // Update History for this week
+            // Update History for this week
+            const historyIndex = student.history.findIndex(h => h.week === week);
+            if (historyIndex >= 0) {
+                student.history[historyIndex].score = score;
+                student.history[historyIndex].speed = speed;
+                if (audioUrl) student.history[historyIndex].audioUrl = audioUrl;
+            } else {
+                student.history.push({ week, score, speed, audioUrl });
+            }
+
+            // Recalc Stats
+            const totalScore = student.history.reduce((acc, h) => acc + h.score, 0);
+            student.averageScore = Math.round(totalScore / student.history.length);
+            student.completedLessons = student.history.length;
+            student.readingSpeed = speed;
+            student.lastPractice = new Date();
+
+            await student.save();
+            return res.json(student);
+        }
+
+        // Fallback: Update Local Data
+        const idx = localStudents.findIndex(s => s.id === id);
+        if (idx === -1) return res.status(404).json({ error: 'Student not found in Local DB' });
+
+        const student = localStudents[idx];
         const historyIndex = student.history.findIndex(h => h.week === week);
+
         if (historyIndex >= 0) {
-            // Update existing week record (keep highest score?)
-            // For now, overwrite with latest attempt
             student.history[historyIndex].score = score;
             student.history[historyIndex].speed = speed;
-            if (audioUrl) student.history[historyIndex].audioUrl = audioUrl; // Save URL
+            if (audioUrl) student.history[historyIndex].audioUrl = audioUrl;
         } else {
             student.history.push({ week, score, speed, audioUrl });
         }
 
-        // Recalc Stats
         const totalScore = student.history.reduce((acc, h) => acc + h.score, 0);
         student.averageScore = Math.round(totalScore / student.history.length);
-        student.completedLessons += 1; // Increment count
-        student.readingSpeed = speed; // Current speed
+        student.completedLessons = student.history.length;
+        student.readingSpeed = speed;
         student.lastPractice = new Date();
 
-        await student.save();
+        localStudents[idx] = student;
+        saveDBToCloud(); // Sync
         res.json(student);
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
