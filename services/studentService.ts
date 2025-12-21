@@ -195,20 +195,39 @@ export const initializeStudentsIfEmpty = async () => {
     let students: StudentStats[] = stored ? JSON.parse(stored) : [];
 
     if (students.length === 0) {
-        console.log("Restoring MOCK DATA...");
+        console.log("Local storage empty. Attempting to fetch from server first...");
+        try {
+            // Try explicit fetch first to avoid race condition with Mock Data
+            const response = await fetch('/api/students');
+            if (response.ok) {
+                const serverData: StudentStats[] = await response.json();
+                if (Array.isArray(serverData) && serverData.length > 0) {
+                    console.log(`Restored ${serverData.length} students from Server.`);
+                    localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(serverData));
+                    window.dispatchEvent(new Event('students_updated'));
+                    return; // EXIT: Data restored from server, skip Mock
+                }
+            }
+        } catch (error) {
+            console.warn("Could not reach server for initial load:", error);
+        }
+
+        // Only if Server is ALSO empty (or unreachable), fallback to Mock
+        console.log("Server empty or unreachable. initializing MOCK DATA...");
         students = MOCK_STUDENTS;
         localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(students));
 
-        // Backfill MOCK data to server immediately
+        // Backfill MOCK data to server
         for (const s of students) {
             await syncStudentToServer(s);
         }
         window.dispatchEvent(new Event('students_updated'));
     }
 
-    // Try to sync/merge on startup (without classId initially, behaves as default)
+    // Standard Sync (Double check)
     syncWithServer();
 };
+
 
 export const resetToMock = () => {
     localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(MOCK_STUDENTS));

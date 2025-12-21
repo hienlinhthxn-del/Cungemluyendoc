@@ -769,6 +769,7 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
     }
 });
 
+
 // --- 6. SERVE FRONTEND ---
 const distPath = path.join(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
@@ -788,7 +789,16 @@ if (fs.existsSync(distPath)) {
 }
 
 
+// WRAP STARTUP IN ASYNC TO WAIT FOR DB/DATA LOAD
+const startServer = async () => {
+    console.log("⏳ Initializing Data Connection...");
+    await connectDB();
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 FULL SERVER running on port ${PORT}`);
-});
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 FULL SERVER running on port ${PORT}`);
+        console.log(`👉 Local: http://localhost:${PORT}`);
+    });
+};
+
+startServer();
+
