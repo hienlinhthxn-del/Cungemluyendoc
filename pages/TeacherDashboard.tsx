@@ -161,9 +161,17 @@ export const TeacherDashboard: React.FC = () => {
     }
   }, [notification]);
 
-  // Filter Data based on Selected Week
+  // Filter Data based on Selected Week & Class
   const weekData = useMemo(() => {
-    return students.map(s => {
+    // 1. Filter by Class ID first
+    const classStudents = students.filter(s => {
+      // If classId is DEFAULT, show students with '1A3' or 'DEFAULT' or undefined
+      if (classId === 'DEFAULT') return !s.classId || s.classId === 'DEFAULT' || s.classId === '1A3';
+      // Otherwise exact match
+      return s.classId === classId;
+    });
+
+    return classStudents.map(s => {
       const weekRecord = s.history.find(h => h.week === selectedWeek);
       return {
         ...s,
@@ -171,7 +179,7 @@ export const TeacherDashboard: React.FC = () => {
         currentSpeed: weekRecord ? weekRecord.speed : '-',
       };
     });
-  }, [students, selectedWeek]);
+  }, [students, selectedWeek, classId]);
 
   const chartData = weekData.map(s => ({
     name: s.name.split(' ').pop(), // Last name
