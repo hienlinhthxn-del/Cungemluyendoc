@@ -689,9 +689,15 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
         for (const file of resources) {
             // Robust Parsing using Regex
             // Matches: student_ID_wWEEK (ignoring extension)
-            // Example: reading-app-audio/student_s1721234_w14.webm
+            // Example: reading-app-audio/student_s1721234_w14.webm or student_AB-123_w14
             const filename = file.public_id.split('/').pop();
-            const match = filename.match(/student_([a-zA-Z0-9]+)_w(\d+)/);
+            // Allow underscores, hyphens in ID. Stop at _w
+            const match = filename.match(/student_([a-zA-Z0-9_-]+)_w(\d+)/);
+
+            if (!match) {
+                console.log(`⚠️ Unmatched file format: ${filename}`);
+                continue;
+            }
 
             if (match) {
                 const studentId = match[1];
