@@ -741,6 +741,12 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
 
             if (!studentId || isNaN(week)) continue;
 
+            // HOTFIX: Prevent restoring this specific student ID
+            if (studentId === 's1766212172691') {
+                console.log("Skipping restore for blocklisted student ID:", studentId);
+                continue;
+            }
+
             // ... (Rest of update logic is same)
             // Construct HTTPS URL
             const audioUrl = file.secure_url;
@@ -760,6 +766,7 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
                         history: []
                     });
                 }
+
 
                 const historyIndex = student.history.findIndex(h => h.week === week);
                 if (historyIndex === -1) {
