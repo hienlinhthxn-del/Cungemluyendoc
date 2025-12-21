@@ -128,6 +128,11 @@ if (cloudName && apiKey && apiSecret) {
                 // Keep original extension or fallback
                 return file.originalname.split('.').pop() || 'webm';
             },
+            public_id: (req, file) => {
+                // Use original filename (without extension) to make it recoverable
+                // Cloudinary will add suffix if not unique, but base name is preserved
+                return file.originalname.split('.')[0];
+            }
         },
     });
     upload = multer({ storage: storage });
@@ -686,93 +691,80 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
         let restoredCount = 0;
 
         // 2. Loop through files and match to students
+        const unmatchedFiles = [];
         for (const file of resources) {
             // Robust Parsing using Regex
-            // Matches: student_ID_wWEEK (ignoring extension)
-            // Example: reading-app-audio/student_s1721234_w14.webm or student_AB-123_w14
             const filename = file.public_id.split('/').pop();
-            // Allow underscores, hyphens in ID. Stop at _w
             const match = filename.match(/student_([a-zA-Z0-9_-]+)_w(\d+)/);
 
             if (!match) {
-                console.log(`⚠️ Unmatched file format: ${filename}`);
+                if (unmatchedFiles.length < 3) unmatchedFiles.push(filename);
                 continue;
             }
 
-            if (match) {
-                const studentId = match[1];
-                const week = parseInt(match[2]);
+            const studentId = match[1];
+            const week = parseInt(match[2]);
 
-                if (!studentId || isNaN(week)) continue;
+            if (!studentId || isNaN(week)) continue;
 
-                // Construct HTTPS URL
-                const audioUrl = file.secure_url;
+            // ... (Rest of update logic is same)
+            // Construct HTTPS URL
+            const audioUrl = file.secure_url;
 
-                // LOGIC SPLIT: MONGO vs LOCAL
-                if (mongoose.connection.readyState === 1) {
-                    // --- MONGO DB MODE ---
-                    let student = await Student.findOne({ id: studentId });
+            // LOGIC SPLIT: MONGO vs LOCAL
+            if (mongoose.connection.readyState === 1) {
+                // --- MONGO DB MODE ---
+                let student = await Student.findOne({ id: studentId });
 
-                    if (!student) {
-                        student = new Student({
-                            id: studentId,
-                            name: `Học sinh (Khôi phục ${studentId.substr(-4)})`,
-                            classId: 'RECOVERED',
-                            completedLessons: 0,
-                            averageScore: 0,
-                            history: []
-                        });
-                        console.log(`➕ Created missing student: ${studentId}`);
-                    }
-
-                    // Update History
-                    const historyIndex = student.history.findIndex(h => h.week === week);
-                    if (historyIndex === -1) {
-                        student.history.push({
-                            week: week,
-                            score: 0,
-                            speed: 0,
-                            audioUrl: audioUrl
-                        });
-                        restoredCount++;
-                    } else if (!student.history[historyIndex].audioUrl) {
-                        student.history[historyIndex].audioUrl = audioUrl;
-                        restoredCount++;
-                    }
-
-                    student.completedLessons = student.history.length;
-                    await student.save();
-                } else {
-                    // --- LOCAL / CLOUDINARY DB MODE ---
-                    let idx = localStudents.findIndex(s => s.id === studentId);
-                    if (idx === -1) {
-                        localStudents.push({
-                            id: studentId,
-                            name: `Học sinh (Khôi phục ${studentId.substr(-4)})`,
-                            classId: 'RECOVERED',
-                            completedLessons: 0,
-                            averageScore: 0,
-                            history: [],
-                            lastPractice: new Date()
-                        });
-                        idx = localStudents.length - 1;
-                        console.log(`➕ Created missing student (Local): ${studentId}`);
-                    }
-
-                    const student = localStudents[idx];
-                    const historyIndex = student.history.findIndex(h => h.week === week);
-
-                    if (historyIndex === -1) {
-                        student.history.push({ week, score: 0, speed: 0, audioUrl });
-                        restoredCount++;
-                    } else if (!student.history[historyIndex].audioUrl) {
-                        student.history[historyIndex].audioUrl = audioUrl;
-                        restoredCount++;
-                    }
-
-                    student.completedLessons = student.history.length;
-                    localStudents[idx] = student;
+                if (!student) {
+                    student = new Student({
+                        id: studentId,
+                        name: `Học sinh (Khôi phục ${studentId.substr(-4)})`,
+                        classId: 'RECOVERED',
+                        completedLessons: 0,
+                        averageScore: 0,
+                        history: []
+                    });
                 }
+
+                const historyIndex = student.history.findIndex(h => h.week === week);
+                if (historyIndex === -1) {
+                    student.history.push({ week, score: 0, speed: 0, audioUrl });
+                    restoredCount++;
+                } else if (!student.history[historyIndex].audioUrl) {
+                    student.history[historyIndex].audioUrl = audioUrl;
+                    restoredCount++;
+                }
+                student.completedLessons = student.history.length;
+                await student.save();
+            } else {
+                // --- LOCAL MODE ---
+                let idx = localStudents.findIndex(s => s.id === studentId);
+                if (idx === -1) {
+                    localStudents.push({
+                        id: studentId,
+                        name: `Học sinh (Khôi phục ${studentId.substr(-4)})`,
+                        classId: 'RECOVERED',
+                        completedLessons: 0,
+                        averageScore: 0,
+                        history: [],
+                        lastPractice: new Date()
+                    });
+                    idx = localStudents.length - 1;
+                }
+
+                const student = localStudents[idx];
+                const historyIndex = student.history.findIndex(h => h.week === week);
+
+                if (historyIndex === -1) {
+                    student.history.push({ week, score: 0, speed: 0, audioUrl });
+                    restoredCount++;
+                } else if (!student.history[historyIndex].audioUrl) {
+                    student.history[historyIndex].audioUrl = audioUrl;
+                    restoredCount++;
+                }
+                student.completedLessons = student.history.length;
+                localStudents[idx] = student;
             }
         }
 
@@ -782,11 +774,17 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
         }
 
         console.log(`✅ Recovery Complete. Restored/Linked ${restoredCount} items.`);
+
+        let msg = `Tìm thấy ${resources.length} file. Đã khôi phục liên kết cho ${restoredCount} bài đọc.`;
+        if (restoredCount === 0 && unmatchedFiles.length > 0) {
+            msg += ` (Mẫu file lạ: ${unmatchedFiles.join(', ')}...)`;
+        }
+
         res.json({
             success: true,
             totalFiles: resources.length,
             restoredCount: restoredCount,
-            message: `Tìm thấy ${resources.length} file. Đã khôi phục liên kết cho ${restoredCount} bài đọc.`
+            message: msg
         });
 
     } catch (error) {
