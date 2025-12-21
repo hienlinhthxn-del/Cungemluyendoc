@@ -658,20 +658,28 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
 
         console.log("🔄 STARTING RECOVERY from Cloudinary...");
 
-        // 1. Fetch all files from Cloudinary
+        // 1. Fetch all files from Cloudinary (Check both 'image' default and 'video' for audio)
         let resources = [];
-        let nextCursor = null;
+        const resourceTypes = ['image', 'video', 'raw']; // Audio often falls under video or raw in Cloudinary
 
-        do {
-            const result = await cloudinary.api.resources({
-                type: 'upload',
-                prefix: 'reading-app-audio/', // Folder prefix
-                max_results: 500,
-                next_cursor: nextCursor
-            });
-            resources = [...resources, ...result.resources];
-            nextCursor = result.next_cursor;
-        } while (nextCursor);
+        for (const type of resourceTypes) {
+            let nextCursor = null;
+            try {
+                do {
+                    const result = await cloudinary.api.resources({
+                        resource_type: type,
+                        type: 'upload',
+                        prefix: 'reading-app-audio/', // Folder prefix
+                        max_results: 500,
+                        next_cursor: nextCursor
+                    });
+                    resources = [...resources, ...result.resources];
+                    nextCursor = result.next_cursor;
+                } while (nextCursor);
+            } catch (e) {
+                console.warn(`Skipping resource type ${type}:`, e.message);
+            }
+        }
 
         console.log(`📂 Found ${resources.length} files on Cloudinary.`);
 
