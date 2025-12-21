@@ -687,15 +687,15 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
 
         // 2. Loop through files and match to students
         for (const file of resources) {
-            // Filename format: "reading-app-audio/student_ID_wWEEK.EXT"
-            const publicId = file.public_id; // "reading-app-audio/student_s123456789_w14"
-            const parts = publicId.split('/').pop().split('_');
+            // Robust Parsing using Regex
+            // Matches: student_ID_wWEEK (ignoring extension)
+            // Example: reading-app-audio/student_s1721234_w14.webm
+            const filename = file.public_id.split('/').pop();
+            const match = filename.match(/student_([a-zA-Z0-9]+)_w(\d+)/);
 
-            // Expected parts: ["student", "s123456789", "w14"]
-            if (parts.length >= 3 && parts[0] === 'student') {
-                const studentId = parts[1];
-                const weekStr = parts[2]; // "w14"
-                const week = parseInt(weekStr.replace('w', ''));
+            if (match) {
+                const studentId = match[1];
+                const week = parseInt(match[2]);
 
                 if (!studentId || isNaN(week)) continue;
 
