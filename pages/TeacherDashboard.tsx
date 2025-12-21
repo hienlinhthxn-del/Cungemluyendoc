@@ -1,10 +1,9 @@
-
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { MOCK_STUDENTS, LESSONS as DEFAULT_LESSONS } from '../constants';
 import { getLessons } from '../services/lessonService';
 import { Lesson } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { PlusCircle, Filter, Download, Upload, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings, BookOpen, RefreshCw, AlertCircle } from 'lucide-react';
+import { PlusCircle, Filter, Download, Upload, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings, BookOpen, RefreshCw, AlertCircle, ExternalLink } from 'lucide-react';
 import { StudentStats } from '../types';
 import { playClick, playSuccess } from '../services/audioService';
 import { AddStudentModal } from '../components/AddStudentModal';
@@ -691,10 +690,19 @@ export const TeacherDashboard: React.FC = () => {
                 setNotification({ message: "Lỗi kết nối server", type: 'error' });
               }
             }}
-            className="p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors"
-            title="Khôi phục dữ liệu từ Cloudinary"
+            className="p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors hidden" // HIDE OLD RECOVER
+            title="Khôi phục dữ liệu từ Cloudinary (Cũ)"
           >
-            <RefreshCw className="w-5 h-5 animate-spin-slow" />
+            <RefreshCw className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={() => window.location.hash = '#/teacher/lost-and-found'}
+            className="p-2 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-2"
+            title="Kho Thất Lạc (Tìm lại bài đọc)"
+          >
+            <ExternalLink className="w-5 h-5" />
+            <span className="text-sm font-semibold hidden md:inline">Kho Thất Lạc</span>
           </button>
         </div>
       </div>

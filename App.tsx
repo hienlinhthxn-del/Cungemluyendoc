@@ -9,6 +9,7 @@ import { ParentDashboard } from './pages/ParentDashboard';
 import { ReportsPage } from './pages/ReportsPage';
 import { LessonManager } from './pages/LessonManagerPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
+import { LostAndFoundPage } from './pages/LostAndFoundPage';
 import { UserRole } from './types';
 import { Users, GraduationCap, Baby, Lock, X, KeyRound, ChevronRight } from 'lucide-react';
 import { playClick, playError, playSuccess } from './services/audioService';
@@ -207,6 +208,7 @@ const App: React.FC = () => {
           <Route path="/teacher" element={<TeacherDashboard />} />
           <Route path="/teacher/reports" element={<ReportsPage />} />
           <Route path="/teacher/lessons" element={<LessonManager />} />
+          <Route path="/teacher/lost-and-found" element={<LostAndFoundPage onBack={() => window.history.back()} />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
 
           <Route path="/parent" element={<ParentDashboard />} />

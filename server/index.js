@@ -355,19 +355,29 @@ app.post('/api/students/:id/progress', async (req, res) => {
     try {
         const { id } = req.params;
         const { score, speed, week, lessonTitle, audioUrl } = req.body;
+        const weekNum = Number(week) || 0; // Ép kiểu sang số (mặc định 0 nếu lỗi)
 
         if (mongoose.connection.readyState === 1) {
-            const student = await Student.findOne({ id });
-            if (!student) return res.status(404).json({ error: 'Student not found' });
+            let student = await Student.findOne({ id });
+
+            // FIX: Nếu không tìm thấy học sinh (do DB mới reset), tự tạo mới thay vì báo lỗi
+            if (!student) {
+                console.log(`⚠️ Auto-creating temporary student record for ID: ${id} (MongoDB Mode)`);
+                student = new Student({
+                    id: id,
+                    name: "Học sinh " + id, // Tên tạm
+                    history: []
+                });
+            }
 
             // Update History for this week
-            const historyIndex = student.history.findIndex(h => h.week === week);
+            const historyIndex = student.history.findIndex(h => h.week === weekNum);
             if (historyIndex >= 0) {
                 student.history[historyIndex].score = score;
                 student.history[historyIndex].speed = speed;
                 if (audioUrl) student.history[historyIndex].audioUrl = audioUrl;
             } else {
-                student.history.push({ week, score, speed, audioUrl });
+                student.history.push({ week: weekNum, score, speed, audioUrl });
             }
 
             // Recalc Stats
@@ -382,18 +392,32 @@ app.post('/api/students/:id/progress', async (req, res) => {
         }
 
         // Fallback: Update Local Data
-        const idx = localStudents.findIndex(s => s.id === id);
-        if (idx === -1) return res.status(404).json({ error: 'Student not found in Local DB' });
+        let idx = localStudents.findIndex(s => s.id === id);
+
+        // FIX: Nếu server khởi động lại mất dữ liệu RAM, tự tạo lại học sinh
+        if (idx === -1) {
+            console.log(`⚠️ Auto-creating temporary student record for ID: ${id} (Local Mode)`);
+            localStudents.push({
+                id: id,
+                name: "Học sinh " + id, // Tên tạm
+                classId: 'DEFAULT',
+                completedLessons: 0,
+                averageScore: 0,
+                history: [],
+                lastPractice: new Date()
+            });
+            idx = localStudents.length - 1;
+        }
 
         const student = localStudents[idx];
-        const historyIndex = student.history.findIndex(h => h.week === week);
+        const historyIndex = student.history.findIndex(h => h.week === weekNum);
 
         if (historyIndex >= 0) {
             student.history[historyIndex].score = score;
             student.history[historyIndex].speed = speed;
             if (audioUrl) student.history[historyIndex].audioUrl = audioUrl;
         } else {
-            student.history.push({ week, score, speed, audioUrl });
+            student.history.push({ week: weekNum, score, speed, audioUrl });
         }
 
         const totalScore = student.history.reduce((acc, h) => acc + h.score, 0);
@@ -803,6 +827,46 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
     }
 });
 
+// --- 6. LOST & FOUND (List all Cloudinary files) ---
+app.get('/api/admin/cloudinary-files', async (req, res) => {
+    try {
+        if (!process.env.CLOUDINARY_CLOUD_NAME) {
+            return res.status(500).json({ error: 'Cloudinary not configured' });
+        }
+
+        const nextCursor = req.query.next_cursor || null;
+
+        // Fetch 'video' (audio) and 'raw' and 'image' mixed? 
+        // Cloudinary API doesn't allow mixed resource_type in one call easily unless using 'search' (advanced).
+        // For simplicity, we'll fetch 'video' which covers most audio uploads from this app.
+        // If user says "still missing", we might add a toggle for 'raw'.
+
+        const result = await cloudinary.api.resources({
+            resource_type: 'video', // Most audios are webm/mp4 -> video
+            type: 'upload',
+            prefix: 'reading-app-audio/',
+            max_results: 50,
+            next_cursor: nextCursor,
+            order: 'created_at:desc' // Newest first
+        });
+
+        res.json({
+            files: result.resources.map(f => ({
+                public_id: f.public_id,
+                url: f.secure_url,
+                created_at: f.created_at,
+                format: f.format,
+                size: f.bytes
+            })),
+            next_cursor: result.next_cursor
+        });
+
+    } catch (error) {
+        console.error("Fetch Files Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // --- 6. SERVE FRONTEND ---
 const distPath = path.join(__dirname, '../dist');
@@ -835,4 +899,3 @@ const startServer = async () => {
 };
 
 startServer();
-
