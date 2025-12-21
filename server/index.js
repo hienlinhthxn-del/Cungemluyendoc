@@ -693,12 +693,22 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
         // 2. Loop through files and match to students
         const unmatchedFiles = [];
         for (const file of resources) {
-            // Robust Parsing using Regex
+            // Source 1: Check Public ID
             const filename = file.public_id.split('/').pop();
-            const match = filename.match(/student_([a-zA-Z0-9_-]+)_w(\d+)/);
+
+            // Source 2: Check Original Filename (Hidden metadata)
+            const originalName = file.original_filename || "";
+
+            // Try matching in Public ID first, then Original Name
+            let match = filename.match(/student_([a-zA-Z0-9_-]+)_w(\d+)/);
+            if (!match && originalName) {
+                match = originalName.match(/student_([a-zA-Z0-9_-]+)_w(\d+)/);
+            }
 
             if (!match) {
-                if (unmatchedFiles.length < 3) unmatchedFiles.push(filename);
+                // Formatting for debug: "[public_id] / [original]"
+                const debugStr = `${filename}${originalName ? ' (' + originalName + ')' : ''}`;
+                if (unmatchedFiles.length < 5) unmatchedFiles.push(debugStr);
                 continue;
             }
 
