@@ -43,8 +43,6 @@ export const syncWithServer = async (classId?: string) => {
             // However, to keep it simple, we will merge with local for preservation of unsynced audios.
             console.log("Syncing: Server has data, updating local...");
 
-            const localStudents = getStudents();
-
             // MERGE STRATEGY: Union (Server + Local-Only)
             // This prevents data loss if Server returns empty list or if local creates haven't pushed yet.
             const serverIds = new Set(serverData.map(s => s.id));
