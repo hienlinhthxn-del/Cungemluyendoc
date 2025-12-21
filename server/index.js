@@ -454,8 +454,19 @@ app.post('/api/students/import', uploadTemp.single('file'), async (req, res) => 
                 badges: []
             };
 
-            await Student.create(newStudent);
+
+            if (mongoose.connection.readyState === 1) {
+                await Student.create(newStudent);
+            } else {
+                // Fallback: Add to Local DB
+                localStudents.push(newStudent);
+            }
             count++;
+        }
+
+        // Sync if in fallback mode
+        if (mongoose.connection.readyState !== 1) {
+            saveDBToCloud();
         }
 
         // Cleanup temp file
@@ -465,6 +476,7 @@ app.post('/api/students/import', uploadTemp.single('file'), async (req, res) => 
 
         console.log(`✅ Imported ${count} students successfully.`);
         res.json({ success: true, count, message: `Thêm thành công ${count} học sinh!` });
+
 
     } catch (error) {
         console.error("❌ Import Failed:", error);
