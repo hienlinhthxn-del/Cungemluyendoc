@@ -3,10 +3,9 @@ import { MOCK_STUDENTS, LESSONS as DEFAULT_LESSONS } from '../constants';
 import { getLessons } from '../services/lessonService';
 import { Lesson } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { PlusCircle, Filter, Download, Upload, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings, BookOpen, RefreshCw, AlertCircle, ExternalLink } from 'lucide-react';
-import { StudentStats } from '../types';
+import { PlusCircle, Filter, Download, Upload, Save, MessageSquare, UserPlus, X, Trash2, Edit, ChevronDown, PlayCircle, StopCircle, Edit2, Check, Settings, BookOpen, RefreshCw, AlertCircle, ExternalLink, School, Users } from 'lucide-react';
+import { StudentStats, Class } from '../types';
 import { playClick, playSuccess } from '../services/audioService';
-import { AddStudentModal } from '../components/AddStudentModal';
 import { AssignHomeworkModal } from '../components/AssignHomeworkModal';
 import { EditStudentModal, EditFormState } from '../components/EditStudentModal';
 import { ChangePasswordForm } from './ChangePasswordForm';
@@ -36,14 +35,30 @@ export const TeacherDashboard: React.FC = () => {
     return Array.from(new Set(allLessons.map(l => l.week))).sort((a: number, b: number) => b - a);
   }, [allLessons]);
 
-  // Fetch Lessons on mount
+  // Fetch Lessons and Classes on mount
   useEffect(() => {
     const fetchData = async () => {
-      const data = await getLessons();
-      if (data.length > 0) {
-        setAllLessons(data);
-        // Optional: auto-select latest week?
-        // setSelectedWeek(Math.max(...data.map(l => l.week)));
+      // 1. Fetch Lessons
+      const lessonData = await getLessons();
+      if (lessonData.length > 0) {
+        setAllLessons(lessonData);
+      }
+
+      // 2. Fetch Classes
+      // Ưu tiên lấy từ LocalStorage (do trang Quản Lý Lớp lưu ở đây) để đồng bộ dữ liệu
+      const savedClasses = localStorage.getItem('classes');
+      if (savedClasses) {
+        setClasses(JSON.parse(savedClasses));
+      } else {
+        try {
+          const res = await fetch('/api/classes');
+          if (res.ok) {
+            const classData = await res.json();
+            setClasses(classData);
+          }
+        } catch (e) {
+          console.error("Failed to load classes", e);
+        }
       }
     };
     fetchData();
@@ -56,6 +71,11 @@ export const TeacherDashboard: React.FC = () => {
 
   // Class ID State
   const [classId, setClassId] = useState(() => localStorage.getItem('teacher_class_id') || 'DEFAULT');
+  const [inputClassId, setInputClassId] = useState(classId);
+
+  useEffect(() => {
+    setInputClassId(classId);
+  }, [classId]);
 
   const handleClassIdChange = async (newClassId: string) => {
     setClassId(newClassId);
@@ -94,7 +114,6 @@ export const TeacherDashboard: React.FC = () => {
   }, [classId]);
 
   // Add Student Modal State
-  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
   // Edit Student Modal State
@@ -105,44 +124,8 @@ export const TeacherDashboard: React.FC = () => {
   const [playingStudentId, setPlayingStudentId] = useState<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.match(/\.(xlsx|xls)$/)) {
-      setNotification({ message: "Vui lòng chọn file Excel (.xlsx, .xls)", type: 'error' });
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('classId', classId);
-
-    setNotification({ message: "Đang nhập dữ liệu...", type: 'success' });
-
-    try {
-      const res = await fetch('/api/students/import', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setNotification({ message: data.message, type: 'success' });
-        playSuccess();
-        await syncWithServer(classId);
-      } else {
-        setNotification({ message: "Lỗi: " + data.error, type: 'error' });
-      }
-    } catch (err: any) {
-      setNotification({ message: "Lỗi kết nối: " + err.message, type: 'error' });
-    }
-
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingStudentId, setUploadingStudentId] = useState<string | null>(null);
 
   // Notification State
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
@@ -166,17 +149,31 @@ export const TeacherDashboard: React.FC = () => {
   const weekData = useMemo(() => {
     // 1. Filter by Class ID first
     const classStudents = students.filter(s => {
+      if (classId === 'ALL') return true;
       // If classId is DEFAULT, show students with '1A3' or 'DEFAULT' or undefined
       if (classId === 'DEFAULT') return !s.classId || s.classId === 'DEFAULT' || s.classId === '1A3';
       // Otherwise exact match
       return s.classId === classId;
     });
-
+    
     return classStudents.map(s => {
       const weekRecord = s.history.find(h => h.week === selectedWeek);
+
+      // Tính điểm trung bình của các phần nhỏ (Âm, Từ, Đoạn văn)
+      const partialScores = [
+        weekRecord?.phonemeScore,
+        weekRecord?.wordScore,
+        weekRecord?.readingScore
+      ].filter((score): score is number => typeof score === 'number');
+
+      const averageScore = partialScores.length > 0
+        ? Math.round(partialScores.reduce((a, b) => a + b, 0) / partialScores.length)
+        : (weekRecord ? weekRecord.score : 0); // Giữ lại điểm cũ nếu không có điểm thành phần
+
       return {
         ...s,
-        currentScore: weekRecord ? weekRecord.score : 0,
+        weekRecord: weekRecord || null,
+        currentScore: averageScore,
         currentSpeed: weekRecord ? weekRecord.speed : '-',
       };
     });
@@ -204,7 +201,15 @@ export const TeacherDashboard: React.FC = () => {
           teacherName: newClassTeacher
         })
       });
-      const data = await res.json();
+
+      let data;
+      const text = await res.text();
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Server returned non-JSON:", text);
+        throw new Error("Server returned invalid response: " + text.substring(0, 50));
+      }
 
       if (res.ok) {
         setClasses(prev => [data, ...prev]);
@@ -220,12 +225,13 @@ export const TeacherDashboard: React.FC = () => {
       } else {
         setNotification({ message: data.error || "Có lỗi xảy ra", type: 'error' });
       }
-    } catch (err) {
-      setNotification({ message: "Lỗi kết nối server", type: 'error' });
+    } catch (err: any) {
+      setNotification({ message: "Lỗi kết nối server: " + (err.message || err), type: 'error' });
     }
   };
 
   const currentClass = useMemo(() => {
+    if (classId === 'ALL') return { name: 'Tất cả học sinh (Toàn trường)' };
     if (classId === 'DEFAULT') return { name: 'Lớp 1A3 (Mặc định)' };
     return classes.find(c => c.id === classId) || { name: `Lớp ${classId}` };
   }, [classes, classId]);
@@ -257,37 +263,6 @@ export const TeacherDashboard: React.FC = () => {
       setSelectedStudent('');
       playSuccess(); // Success sound
     }
-  };
-
-  const handleAddStudent = (newStudentName: string) => {
-    if (!newStudentName) return;
-
-    const newStudent: StudentStats = {
-      id: `s${Date.now()}`,
-      name: newStudentName,
-      classId: classId, // Assign current class ID
-      completedLessons: 0,
-      averageScore: 0,
-      readingSpeed: 0,
-      history: weeks.map(w => ({ week: w, score: 0, speed: 0 })),
-      lastPractice: new Date(),
-      badges: []
-    };
-
-    // Save to LocalStorage
-    const updatedStudents = [...students, newStudent];
-    setStudents(updatedStudents);
-    localStorage.setItem('app_students_data', JSON.stringify(updatedStudents));
-
-    // Save to Server
-    fetch('/api/students', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: newStudent.id, name: newStudent.name })
-    }).catch(err => console.error("Failed to sync new student to server", err));
-
-    setIsAddStudentOpen(false);
-    playSuccess(); // Success sound
   };
 
   const handleAssignHomework = (lessonId: string, note: string, dueDate: string, readingLimit: number, quizLimit: number) => {
@@ -339,17 +314,16 @@ export const TeacherDashboard: React.FC = () => {
   const handleDeleteStudent = async (id: string, name: string) => {
     playClick();
     if (window.confirm(`Bạn có chắc chắn muốn xóa học sinh ${name} khỏi lớp không?`)) {
-      // 1. Update State
-      let newStudents: StudentStats[] = [];
-      setStudents(prev => {
-        newStudents = prev.filter(s => s.id !== id);
-        return newStudents;
-      });
+      // 1. Tạo mảng học sinh mới một cách an toàn, dựa trên state hiện tại.
+      const newStudents = students.filter(s => s.id !== id);
 
-      // 2. Update LocalStorage
+      // 2. Cập nhật React State
+      setStudents(newStudents);
+
+      // 3. Cập nhật LocalStorage với mảng dữ liệu chính xác
       localStorage.setItem('app_students_data', JSON.stringify(newStudents));
 
-      // 3. Sync to Server
+      // 4. Đồng bộ lên Server
       try {
         const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
         if (res.ok) {
@@ -373,76 +347,123 @@ export const TeacherDashboard: React.FC = () => {
   const handleUpdateStudent = useCallback((editForm: EditFormState) => {
     if (!editingStudent) return;
 
-    let updatedStudents: StudentStats[] = [];
+    // 1. Create the new, updated array of students immutably.
+    const updatedStudents = students.map(s => {
+      if (s.id !== editingStudent.id) {
+        return s;
+      }
 
-    setStudents(prev => {
-      const newData = prev.map(s => {
-        if (s.id !== editingStudent.id) {
-          return s;
-        }
+      // Update specific week history
+      const historyExists = s.history.some(h => h.week === selectedWeek);
+      const updatedHistory = historyExists
+        ? s.history.map(h =>
+          h.week === selectedWeek
+            ? {
+              ...h,
+              score: Number(editForm.score),
+              speed: editForm.speed,
+              readingScore: editForm.readingScore,
+              wordScore: editForm.wordScore,
+              sentenceScore: editForm.sentenceScore,
+              exerciseScore: editForm.exerciseScore
+            }
+            : h
+        )
+        : [...s.history, {
+          week: selectedWeek,
+          score: Number(editForm.score),
+          speed: editForm.speed,
+          readingScore: editForm.readingScore,
+          wordScore: editForm.wordScore,
+          sentenceScore: editForm.sentenceScore,
+          exerciseScore: editForm.exerciseScore
+        }];
 
-        // Update specific week history
-        const historyExists = s.history.some(h => h.week === selectedWeek);
-        const updatedHistory = historyExists
-          ? s.history.map(h =>
-            h.week === selectedWeek
-              ? {
-                ...h,
-                score: Number(editForm.score),
-                speed: editForm.speed,
-                readingScore: editForm.readingScore,
-                wordScore: editForm.wordScore,
-                sentenceScore: editForm.sentenceScore,
-                exerciseScore: editForm.exerciseScore
-              }
-              : h
-          )
-          : [...s.history, {
-            week: selectedWeek,
-            score: Number(editForm.score),
-            speed: editForm.speed,
-            readingScore: editForm.readingScore,
-            wordScore: editForm.wordScore,
-            sentenceScore: editForm.sentenceScore,
-            exerciseScore: editForm.exerciseScore
-          }];
-
-        return {
-          ...s,
-          name: editForm.name,
-          completedLessons: Number(editForm.completedLessons),
-          history: updatedHistory,
-          // Update top-level stats if it's the latest week
-          averageScore: selectedWeek === 18 ? Number(editForm.score) : s.averageScore,
-          readingSpeed: selectedWeek === 18 ? editForm.speed : s.readingSpeed
-        };
-      });
-
-      updatedStudents = newData;
-      return newData;
+      return {
+        ...s,
+        name: editForm.name,
+        completedLessons: Number(editForm.completedLessons),
+        history: updatedHistory,
+        // Update top-level stats if it's the latest week
+        averageScore: selectedWeek === 18 ? Number(editForm.score) : s.averageScore,
+        readingSpeed: selectedWeek === 18 ? editForm.speed : s.readingSpeed
+      };
     });
 
-    // Save to LocalStorage immediately
-    // We use a timeout to ensure state hook has fired, or just use the computed variable 'updatedStudents'
-    if (updatedStudents.length > 0) {
-      localStorage.setItem('app_students_data', JSON.stringify(updatedStudents));
+    // 2. Update the React state with the new array.
+    setStudents(updatedStudents);
 
-      // Sync to Server (Optimistic)
-      // We find the updated student and send it
-      const updatedStudent = updatedStudents.find(s => s.id === editingStudent.id);
-      if (updatedStudent) {
-        fetch('/api/students', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedStudent)
-        }).catch(console.error);
-      }
+    // 3. Save the new array to LocalStorage.
+    localStorage.setItem('app_students_data', JSON.stringify(updatedStudents));
+
+    // 4. Sync the specific updated student to the server.
+    const updatedStudent = updatedStudents.find(s => s.id === editingStudent.id);
+    if (updatedStudent) {
+      fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedStudent)
+      }).catch(console.error);
     }
 
     setIsEditModalOpen(false);
     setEditingStudent(null);
     playSuccess();
-  }, [editingStudent, selectedWeek]);
+  }, [editingStudent, selectedWeek, students]);
+
+  // --- AUDIO UPLOAD LOGIC ---
+  const handleUploadClick = (studentId: string) => {
+    setUploadingStudentId(studentId);
+    uploadInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadingStudentId) return;
+
+    const audioUrl = URL.createObjectURL(file);
+
+    setStudents(prev => {
+      const updated = prev.map(s => {
+        if (s.id !== uploadingStudentId) return s;
+
+        // Update history
+        const historyIndex = s.history.findIndex(h => h.week === selectedWeek);
+        let newHistory = [...s.history];
+
+        if (historyIndex >= 0) {
+          newHistory[historyIndex] = {
+            ...newHistory[historyIndex],
+            audioUrl: audioUrl
+          };
+        } else {
+          newHistory.push({
+            week: selectedWeek,
+            score: 0,
+            speed: 0,
+            audioUrl: audioUrl
+          } as any);
+        }
+
+        return { ...s, history: newHistory };
+      });
+
+      localStorage.setItem('app_students_data', JSON.stringify(updated));
+      return updated;
+    });
+
+    setNotification({ message: "Đã tải lên file ghi âm thành công!", type: 'success' });
+    playSuccess();
+
+    if (uploadInputRef.current) uploadInputRef.current.value = '';
+    setUploadingStudentId(null);
+  };
+
+  const playAudioUrl = (url: string) => {
+    playClick();
+    const audio = new Audio(url);
+    audio.play().catch(e => alert("Lỗi phát audio: " + e.message));
+  };
 
   // --- AUDIO PLAYBACK LOGIC ---
   const handlePlayRecording = (student: StudentStats) => {
@@ -466,8 +487,7 @@ export const TeacherDashboard: React.FC = () => {
     const weekRecord = student.history.find(h => h.week === selectedWeek);
     if (weekRecord?.audioUrl) {
       console.log("Playing real audio:", weekRecord.audioUrl);
-      const audio = new Audio(weekRecord.audioUrl);
-      setPlayingStudentId(student.id);
+      const audio = new Audio(weekRecord.audioUrl || '');
 
       audio.play().catch(e => {
         alert("Không thể phát file ghi âm: " + e.message);
@@ -480,6 +500,7 @@ export const TeacherDashboard: React.FC = () => {
 
     // 2. Fallback to SIMULATION (Text-to-Speech)
     // Only if no real recording exists
+    setNotification({ message: "Học sinh chưa có file ghi âm. Đang phát giọng đọc mô phỏng.", type: 'error' });
     setPlayingStudentId(student.id);
 
     // Get text content for the selected week
@@ -504,6 +525,12 @@ export const TeacherDashboard: React.FC = () => {
     utterance.onerror = () => setPlayingStudentId(null);
 
     window.speechSynthesis.speak(utterance);
+  };
+
+  const openParentView = (studentId: string) => {
+    playClick();
+    const url = `/#/parent?studentId=${studentId}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleExportReport = () => {
@@ -551,6 +578,18 @@ export const TeacherDashboard: React.FC = () => {
     });
   };
 
+  const handleMigrateStudents = () => {
+    if (classId === 'ALL' || classId === 'DEFAULT') return;
+
+    if (window.confirm(`Bạn có muốn chuyển TOÀN BỘ ${students.length} học sinh đang có trong hệ thống về lớp "${currentClass.name}" (Mã: ${classId}) không?`)) {
+      const updatedStudents = students.map(s => ({ ...s, classId: classId }));
+      setStudents(updatedStudents);
+      localStorage.setItem('app_students_data', JSON.stringify(updatedStudents));
+      setNotification({ message: `Đã chuyển ${students.length} học sinh về lớp ${currentClass.name}`, type: 'success' });
+      playSuccess();
+    }
+  };
+
   return (
     <div className="space-y-8 relative">
       {/* Notification Toast */}
@@ -574,49 +613,60 @@ export const TeacherDashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <div className="relative group">
-               <button className="flex items-center gap-2 text-2xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
-                 <School className="w-8 h-8" />
-                 {currentClass.name}
-                 <ChevronDown className="w-5 h-5 opacity-50" />
-               </button>
-               
-               {/* Class Dropdown */}
-               <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 p-2 hidden group-hover:block z-50 animate-fade-in-up">
-                 <div className="max-h-60 overflow-y-auto">
-                   <button
-                      onClick={() => handleClassIdChange('DEFAULT')}
-                      className={`w-full text-left px-4 py-2 rounded-lg mb-1 ${classId === 'DEFAULT' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50'}`}
-                   >
-                     Lớp 1A3 (Mặc định)
-                   </button>
-                   {classes.map(cls => (
-                     <button
-                       key={cls.id}
-                       onClick={() => handleClassIdChange(cls.id)}
-                       className={`w-full text-left px-4 py-2 rounded-lg mb-1 ${classId === cls.id ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50'}`}
-                     >
-                       {cls.name} <span className="text-xs text-gray-400 ml-1">({cls.id})</span>
-                     </button>
-                   ))}
-                 </div>
-                 <div className="border-t border-gray-100 mt-1 pt-1">
-                   <button
-                     onClick={() => setIsCreateClassModalOpen(true)}
-                     className="w-full flex items-center gap-2 px-4 py-2 text-green-600 hover:bg-green-50 rounded-lg font-medium"
-                   >
-                     <PlusCircle className="w-4 h-4" />
-                     Tạo lớp mới
-                   </button>
-                 </div>
-               </div>
-            </div>
+            <form 
+              onSubmit={(e) => { e.preventDefault(); handleClassIdChange(inputClassId); }}
+              className="flex items-center gap-2"
+            >
+              <School className="w-8 h-8 text-blue-600" />
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 font-semibold uppercase">Nhập Mã Lớp</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={inputClassId}
+                    onChange={(e) => setInputClassId(e.target.value)}
+                    onBlur={() => handleClassIdChange(inputClassId)}
+                    className="text-2xl font-bold text-gray-900 border-b-2 border-gray-300 focus:border-blue-600 focus:outline-none bg-transparent transition-colors placeholder-gray-300 w-48"
+                    placeholder="Mã lớp..."
+                  />
+                  <button type="submit" className="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 font-bold">Xem</button>
+                </div>
+              </div>
+            </form>
+            
+            <button 
+              onClick={() => handleClassIdChange('ALL')}
+              className={`ml-3 px-4 py-2 rounded-xl border-2 transition-all flex flex-col items-center ${classId === 'ALL' ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:bg-blue-50'}`}
+              title="Bấm vào đây để xem toàn bộ học sinh nếu bạn không tìm thấy lớp"
+            >
+               <span className="text-[10px] font-bold uppercase tracking-wider">Tổng Hệ Thống</span>
+               <span className="text-xl font-black leading-none">{students.length} <span className="text-[10px] font-normal">em</span></span>
+            </button>
           </div>
+
+          {/* Quick Class Selection List */}
+          {classes.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3 animate-fade-in">
+              <span className="text-xs text-gray-400 flex items-center font-semibold uppercase mr-1">Chọn nhanh:</span>
+              {classes.map(cls => (
+                <button
+                  key={cls.id}
+                  onClick={() => handleClassIdChange(cls.id)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                    classId === cls.id 
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' 
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50'
+                  }`}
+                >
+                  {cls.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center gap-4 mb-2">
              <p className="text-gray-500 text-sm">
-                Đang quản lý: <span className="font-bold text-gray-700">{currentClass.name}</span>
-                {classId !== 'DEFAULT' && <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">ID: {classId}</span>}
+                Tên lớp: <span className="font-bold text-gray-700">{currentClass.name}</span>
              </p>
           </div>
 
@@ -646,31 +696,10 @@ export const TeacherDashboard: React.FC = () => {
         </div>
         <div className="flex gap-3 flex-wrap">
           <button
-            onClick={() => {
-              setIsAddStudentOpen(true);
-              try { playClick(); } catch (e) { }
-            }}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-sm transition-all transform hover:scale-105"
+            onClick={() => { playClick(); window.location.hash = '/teacher/classes'; }}
+            className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 bg-gradient-to-r hover:from-blue-50 hover:to-white transition-all duration-300"
           >
-            <UserPlus className="w-4 h-4 mr-2" /> Thêm Học Sinh
-          </button>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImportExcel}
-            accept=".xlsx, .xls"
-            className="hidden"
-          />
-          <button
-            onClick={() => {
-              playClick();
-              fileInputRef.current?.click();
-            }}
-            className="flex items-center px-4 py-2 bg-green-100 text-green-700 border border-green-200 rounded-lg font-bold hover:bg-green-200 shadow-sm transition-all"
-            title="Nhập danh sách học sinh từ file Excel"
-          >
-            <Upload className="w-4 h-4 mr-2" /> Nhập Excel
+            <School className="w-4 h-4 mr-2" /> Quản Lý Lớp
           </button>
 
           <button
@@ -730,6 +759,15 @@ export const TeacherDashboard: React.FC = () => {
             <ExternalLink className="w-5 h-5" />
             <span className="text-sm font-semibold hidden md:inline">Kho Thất Lạc</span>
           </button>
+
+          {/* Hidden File Input for Audio Upload */}
+          <input
+            type="file"
+            ref={uploadInputRef}
+            onChange={handleFileChange}
+            accept="audio/*"
+            className="hidden"
+          />
         </div>
       </div>
 
@@ -790,53 +828,132 @@ export const TeacherDashboard: React.FC = () => {
         <h3 className="text-lg font-bold text-gray-800 mb-4">Danh Sách Nộp Bài (Tuần {selectedWeek})</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left text-gray-600">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+            <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-semibold">
               <tr>
-                <th className="px-4 py-3 rounded-l-lg">Học Sinh</th>
-                <th className="px-4 py-3">Điểm Số</th>
-                <th className="px-4 py-3">Ghi Âm</th>
-                <th className="px-4 py-3 rounded-r-lg">Chi tiết</th>
+                <th className="px-6 py-4 text-left">Học sinh</th>
+                <th className="px-4 py-4 text-center bg-blue-50/50">Âm / Vần</th>
+                <th className="px-4 py-4 text-center bg-yellow-50/50">Từ Ngữ</th>
+                <th className="px-4 py-4 text-center bg-green-50/50">Đoạn Văn</th>
+                <th className="px-6 py-4 text-center">Tổng Kết</th>
+                <th className="px-6 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody>
-              {weekData.map(student => {
-                const audioUrl = student.history.find(h => h.week === selectedWeek)?.audioUrl;
+            <tbody className="divide-y divide-gray-100">
+              {weekData.map((student) => {
+                const { weekRecord } = student;
+                const mainAudioUrl = weekRecord?.audioUrl;
+                const hasAnyAudio = mainAudioUrl || weekRecord?.phonemeAudioUrl || weekRecord?.wordAudioUrl || weekRecord?.readingAudioUrl;
+
                 return (
-                  <tr key={student.id} className="border-b hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900 flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
-                        {student.name.split(' ').pop()?.[0]}
+                  <tr key={student.id} className="hover:bg-blue-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
+                          {student.name.charAt(0)}
+                        </div>
+                        <span className="font-medium text-gray-900">{student.name}</span>
                       </div>
-                      {student.name}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${student.currentScore >= 80 ? 'bg-green-100 text-green-700' :
-                        student.currentScore >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                        {student.currentScore > 0 ? `${student.currentScore} đ` : 'Chưa thi'}
-                      </span>
+                    
+                    {/* Âm / Vần */}
+                    <td className="px-4 py-3 text-center border-l border-gray-100 bg-blue-50/30">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="font-bold text-gray-700">{weekRecord?.phonemeScore ?? '-'}</span>
+                        {weekRecord?.phonemeAudioUrl ? (
+                          <button onClick={() => playAudioUrl(weekRecord.phonemeAudioUrl)} className="text-blue-600 hover:scale-110 transition-transform"><PlayCircle className="w-5 h-5" /></button>
+                        ) : <span className="text-[10px] text-gray-300">--</span>}
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      {audioUrl ? (
-                        <button
-                          onClick={() => {
-                            playClick();
-                            const audio = new Audio(audioUrl);
-                            audio.play().catch(e => alert("Lỗi phát audio: " + e.message));
-                          }}
-                          className="flex items-center gap-1 text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded-full text-xs font-bold shadow-sm transition-all transform hover:scale-105"
-                          title="Nghe giọng đọc"
-                        >
-                          <PlayCircle className="w-3 h-3" /> Nghe
-                        </button>
+                    
+                    {/* Từ Ngữ */}
+                    <td className="px-4 py-3 text-center border-l border-gray-100 bg-yellow-50/30">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="font-bold text-gray-700">{weekRecord?.wordScore ?? '-'}</span>
+                        {weekRecord?.wordAudioUrl ? (
+                          <button onClick={() => playAudioUrl(weekRecord.wordAudioUrl)} className="text-yellow-600 hover:scale-110 transition-transform"><PlayCircle className="w-5 h-5" /></button>
+                        ) : <span className="text-[10px] text-gray-300">--</span>}
+                      </div>
+                    </td>
+                    
+                    {/* Đoạn Văn */}
+                    <td className="px-4 py-3 text-center border-l border-gray-100 bg-green-50/30">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="font-bold text-gray-700">{weekRecord?.readingScore ?? '-'}</span>
+                        {weekRecord?.readingAudioUrl ? (
+                          <button onClick={() => playAudioUrl(weekRecord.readingAudioUrl)} className="text-green-600 hover:scale-110 transition-transform"><PlayCircle className="w-5 h-5" /></button>
+                        ) : <span className="text-[10px] text-gray-300">--</span>}
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex flex-col items-center">
+                        <span className={`font-bold text-lg ${student.currentScore >= 80 ? 'text-green-600' : student.currentScore >= 50 ? 'text-blue-600' : 'text-red-500'}`}>
+                          {student.currentScore > 0 ? student.currentScore : '-'}
+                        </span>
+                        <span className="text-[10px] text-gray-500">
+                          Tốc độ: {student.currentSpeed || '-'}
+                        </span>
+                      </div>
+                      {(student.currentScore > 0 || hasAnyAudio) ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <button
+                            onClick={() => handlePlayRecording(student)}
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${playingStudentId === student.id
+                              ? 'bg-green-100 text-green-700 ring-2 ring-green-400'
+                              : hasAnyAudio
+                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                              }`}
+                            title={mainAudioUrl ? "Phát file ghi âm tổng" : "Không có file tổng - Phát mô phỏng"}
+                          >
+                            {playingStudentId === student.id ? (
+                              <>
+                                <StopCircle className="w-3 h-3 animate-pulse" /> Đang phát...
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="w-3 h-3" /> {mainAudioUrl ? "Nghe Tổng" : "Mô Phỏng"}
+                              </>
+                            )}
+                          </button>
+                          {!mainAudioUrl && <span className="text-[10px] text-red-500 font-bold">⚠ Thiếu file tổng</span>}
+                        </div>
                       ) : (
-                        <span className="text-gray-300 text-xs italic">--</span>
+                        <span className="text-xs text-gray-400 italic mb-1 block">Chưa nộp</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => openEditModal(student)} className="p-1 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
-                        <Edit2 className="w-4 h-4" />
+
+                      <button
+                        onClick={() => handleUploadClick(student.id)} // This is for the main audio file
+                        className="mt-1 text-[10px] flex items-center gap-1 text-gray-500 hover:text-blue-600 bg-gray-50 px-2 py-1 rounded border border-gray-200 mx-auto"
+                        title="Tải lên file ghi âm cho học sinh này"
+                      >
+                        <Upload className="w-3 h-3" /> {mainAudioUrl ? 'Sửa file' : 'Tải file'}
                       </button>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => openParentView(student.id)}
+                          className="text-gray-400 hover:text-green-500 transition-colors"
+                          title={`Xem trang phụ huynh của em ${student.name}`}
+                        >
+                          <ExternalLink className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => openEditModal(student)}
+                          className="text-gray-400 hover:text-blue-500 transition-colors"
+                          title={`Chỉnh sửa điểm tuần ${selectedWeek}`}
+                        >
+                          <Edit className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStudent(student.id, student.name)}
+                          className="text-gray-400 hover:text-red-500 transition-colors"
+                          title="Xóa học sinh"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -844,6 +961,26 @@ export const TeacherDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
+        {weekData.length === 0 && (
+          <div className="text-center py-12 bg-gray-50 rounded-b-xl border-t border-gray-100">
+             <p className="text-gray-400 font-medium mb-2">Không tìm thấy học sinh nào trong lớp "{classId}".</p>
+             <div className="flex flex-col items-center gap-3">
+               <button onClick={() => handleClassIdChange('ALL')} className="text-blue-600 font-bold hover:underline">
+                  &larr; Bấm vào đây để xem tất cả {students.length} học sinh đang có
+               </button>
+               
+               {students.length > 0 && classId !== 'ALL' && classId !== 'DEFAULT' && (
+                 <button 
+                   onClick={handleMigrateStudents}
+                   className="px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg font-bold hover:bg-yellow-200 border border-yellow-300 flex items-center gap-2 shadow-sm"
+                 >
+                   <RefreshCw className="w-4 h-4" />
+                   Chuyển toàn bộ {students.length} HS về lớp này
+                 </button>
+               )}
+             </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -992,120 +1129,6 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Student List */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold text-gray-800">Danh Sách Học Sinh - Tuần {selectedWeek}</h3>
-            <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full">{students.length} em</span>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => { playClick(); setIsAddStudentOpen(true); }}
-              className="flex items-center px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg text-sm font-bold border border-green-200 transition-colors"
-            >
-              <PlusCircle className="w-4 h-4 mr-1.5" /> Thêm mới
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
-              <Filter className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-semibold">
-              <tr>
-                <th className="px-6 py-4 text-left">Học sinh</th>
-                <th className="px-6 py-4 text-center">Tốc độ (tiếng/phút)</th>
-                <th className="px-6 py-4 text-center">Điểm Tuần {selectedWeek}</th>
-                <th className="px-6 py-4 text-center">Bản ghi âm</th>
-                <th className="px-6 py-4 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {weekData.map((student) => (
-                <tr key={student.id} className="hover:bg-blue-50/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
-                        {student.name.charAt(0)}
-                      </div>
-                      <span className="font-medium text-gray-900">{student.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={`inline-block px-3 py-1 rounded text-sm font-bold ${typeof student.currentSpeed === 'string'
-                      ? 'bg-red-100 text-red-600' // Status like "Đánh vần"
-                      : Number(student.currentSpeed) >= 30 ? 'bg-green-100 text-green-700'
-                        : Number(student.currentSpeed) >= 15 ? 'bg-blue-100 text-blue-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}>
-                      {student.currentSpeed}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={`font-bold ${student.currentScore >= 80 ? 'text-green-600' :
-                      student.currentScore >= 50 ? 'text-blue-600' :
-                        student.currentScore === 0 ? 'text-gray-400' : 'text-red-500'
-                      }`}>
-                      {student.currentScore === 0 ? '-' : student.currentScore}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {student.currentScore > 0 ? (
-                      <button
-                        onClick={() => handlePlayRecording(student)}
-                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${playingStudentId === student.id
-                          ? 'bg-green-100 text-green-700 ring-2 ring-green-400'
-                          : 'bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600'
-                          }`}
-                      >
-                        {playingStudentId === student.id ? (
-                          <>
-                            <StopCircle className="w-3 h-3 animate-pulse" /> Đang phát...
-                          </>
-                        ) : (
-                          <>
-                            <PlayCircle className="w-3 h-3" /> Nghe lại
-                          </>
-                        )}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-gray-400 italic">Chưa nộp</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditModal(student)}
-                        className="text-gray-400 hover:text-blue-500 transition-colors"
-                        title={`Chỉnh sửa điểm tuần ${selectedWeek}`}
-                      >
-                        <Edit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteStudent(student.id, student.name)}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
-                        title="Xóa học sinh"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Add Student Modal */}
-      <AddStudentModal
-        isOpen={isAddStudentOpen}
-        onClose={() => setIsAddStudentOpen(false)}
-        onAdd={handleAddStudent}
-      />
-
       {/* Modal Tạo Lớp */}
       {isCreateClassModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 animate-fade-in">
@@ -1219,11 +1242,15 @@ const SystemHealthCheck = () => {
       try {
         // 1. Check Basic Health (Mongo)
         const healthRes = await fetch('/api/health');
-        const healthData = await healthRes.json();
+        const healthData = await healthRes.json().catch(() => 
+          ({ mongo_status: 'error', storage_mode: 'unknown', error: 'Server không trả về JSON hợp lệ' })
+        );
 
         // 2. Check Cloudinary Connection (Real Ping)
         const cloudRes = await fetch('/api/test-cloudinary');
-        const cloudData = await cloudRes.json();
+        const cloudData = await cloudRes.json().catch(() => 
+          ({ status: 'error', message: 'Server không trả về JSON hợp lệ' })
+        );
 
         setHealth({
           mongo: healthData.mongo_status || healthData.mongo, // Correct property is mongo_status
@@ -1233,6 +1260,7 @@ const SystemHealthCheck = () => {
         });
       } catch (e) {
         console.error("System Check Error", e);
+        setHealth({ mongo: 'error', cloudinary: 'error', cloudDetails: 'Yêu cầu mạng thất bại' });
       } finally {
         setLoading(false);
       }

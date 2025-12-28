@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { MOCK_STUDENTS } from '../constants';
-import { Trophy, TrendingUp, Calendar, MessageCircle, PlayCircle, Search, User, ArrowLeft, Edit2, Check, X, Send } from 'lucide-react';
+import { Trophy, TrendingUp, Calendar, MessageCircle, PlayCircle, Search, User, ArrowLeft, Edit2, Check, X, Send, ExternalLink } from 'lucide-react';
 import { StudentStats } from '../types';
 import { playClick, playSuccess } from '../services/audioService';
 import { getCommunications, saveCommunication, Communication } from '../services/communicationService';
@@ -10,8 +11,9 @@ import { getStudents, syncWithServer } from '../services/studentService';
 
 export const ParentDashboard: React.FC = () => {
   const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
-  const [selectedStudent, setSelectedStudent] = useState<StudentStats | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<StudentStats | null>(null); // Khởi tạo là null
   const [searchTerm, setSearchTerm] = useState('');
+  const location = useLocation(); // Lấy object location để đọc query params
 
   // Teacher Name State
   const [teacherName, setTeacherName] = useState('Cô giáo Hiền');
@@ -36,6 +38,30 @@ export const ParentDashboard: React.FC = () => {
       setTeacherMessages(messages);
     }
   }, [selectedStudent]);
+
+  // Effect này sẽ xử lý việc chọn học sinh từ URL hoặc localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const studentIdFromUrl = params.get('studentId');
+    const allStudents = getStudents(); // Lấy danh sách học sinh mới nhất
+
+    let studentToSelect: StudentStats | undefined;
+
+    if (studentIdFromUrl) {
+      // Ưu tiên 1: Lấy ID học sinh từ URL
+      studentToSelect = allStudents.find(s => s.id === studentIdFromUrl);
+    } else {
+      // Ưu tiên 2: Lấy ID từ localStorage (hành vi cũ)
+      const savedId = localStorage.getItem('current_student_id');
+      if (savedId) {
+        studentToSelect = allStudents.find(s => s.id === savedId);
+      }
+    }
+
+    if (studentToSelect) {
+      setSelectedStudent(studentToSelect);
+    }
+  }, [location.search]); // Chạy lại khi URL thay đổi
 
   // Initial Sync for Parent (Fetch ALL students so search works)
   useEffect(() => {
@@ -100,6 +126,25 @@ export const ParentDashboard: React.FC = () => {
     setIsEditingTeacher(false);
   };
 
+  // --- TÍNH TOÁN DỮ LIỆU ĐỘNG (PHẢI ĐẶT TRƯỚC RETURN CÓ ĐIỀU KIỆN) ---
+  const latestWeekRecord = useMemo(() => {
+    if (!selectedStudent?.history || selectedStudent.history.length === 0) {
+      return null;
+    }
+    // Sắp xếp lịch sử nộp bài theo tuần giảm dần và lấy bài đầu tiên
+    return [...selectedStudent.history].sort((a, b) => b.week - a.week)[0];
+  }, [selectedStudent]);
+
+  const displayScore = latestWeekRecord ? latestWeekRecord.score : 0;
+  const displayWeek = latestWeekRecord ? latestWeekRecord.week : '...';
+  const displaySpeed = latestWeekRecord ? latestWeekRecord.speed : 0;
+
+  // Phải bọc trong useMemo để xử lý trường hợp selectedStudent là null
+  const { timeGreeting, randomMsg } = useMemo(() => {
+    if (!selectedStudent) return { timeGreeting: '', randomMsg: '' };
+    return getGreeting(selectedStudent.name);
+  }, [selectedStudent, getGreeting]);
+
   const handleSendFeedback = () => {
     if (!feedbackMessage.trim() || !selectedStudent) return;
 
@@ -151,6 +196,7 @@ export const ParentDashboard: React.FC = () => {
               onClick={() => {
                 playClick();
                 setSelectedStudent(student);
+                localStorage.setItem('current_student_id', student.id);
               }}
               className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex items-center gap-4 text-left group"
             >
@@ -173,8 +219,6 @@ export const ParentDashboard: React.FC = () => {
       </div>
     );
   }
-
-  const { timeGreeting, randomMsg } = getGreeting(selectedStudent.name);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-fade-in-up relative">
@@ -202,7 +246,7 @@ export const ParentDashboard: React.FC = () => {
         </div>
         <div className="hidden sm:block text-right">
           <span className="inline-block bg-secondary text-blue-900 px-4 py-2 rounded-full font-bold shadow-sm mb-1">
-            Tuần 13
+            Tuần {displayWeek}
           </span>
           <p className="text-sm text-gray-500">Dữ liệu cập nhật mới nhất</p>
         </div>
@@ -221,21 +265,21 @@ export const ParentDashboard: React.FC = () => {
         {/* Progress Card */}
         <div className="bg-gradient-to-br from-green-400 to-emerald-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden transform hover:scale-[1.02] transition-transform">
           <Trophy className="absolute top-4 right-4 w-24 h-24 text-white opacity-10 rotate-12" />
-          <h3 className="text-lg font-medium opacity-90 mb-1">Điểm trung bình hiện tại</h3>
-          <p className="text-5xl font-bold mb-4">{selectedStudent.averageScore}</p>
+          <h3 className="text-lg font-medium opacity-90 mb-1">Điểm Tuần Gần Nhất</h3>
+          <p className="text-5xl font-bold mb-4">{displayScore}</p>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 bg-white/20 p-2 rounded-lg w-full backdrop-blur-sm">
               <TrendingUp className="w-4 h-4" />
               <span className="text-sm font-medium">
-                {selectedStudent.averageScore >= 80 ? 'Tiến bộ vượt bậc!' : 'Cần cố gắng thêm chút nữa.'}
+                {displayScore >= 80 ? 'Tiến bộ vượt bậc!' : 'Cần cố gắng thêm chút nữa.'}
               </span>
             </div>
-            {selectedStudent.readingSpeed && (
+            {displaySpeed > 0 && (
               <div className="flex items-center gap-2 bg-white/20 p-2 rounded-lg w-full backdrop-blur-sm">
                 <User className="w-4 h-4" />
                 <span className="text-sm font-medium">
-                  Tốc độ đọc: {selectedStudent.readingSpeed} tiếng/phút
+                  Tốc độ đọc: {displaySpeed} tiếng/phút
                 </span>
               </div>
             )}
@@ -249,7 +293,7 @@ export const ParentDashboard: React.FC = () => {
             Hoạt động gần đây
           </h3>
           <div className="space-y-4">
-            {selectedStudent.history.filter(h => h.week < 13).slice(-3).reverse().map((record, i) => (
+            {[...selectedStudent.history].sort((a, b) => b.week - a.week).slice(0, 3).map((record, i) => (
               <div key={i} className="flex items-start gap-3 pb-3 border-b border-gray-50 last:border-0">
                 <div className="p-2 bg-blue-50 rounded-lg text-primary">
                   <PlayCircle className="w-5 h-5" />
@@ -278,9 +322,9 @@ export const ParentDashboard: React.FC = () => {
         </h3>
         <div className="bg-white p-4 rounded-xl shadow-sm">
           <p className="text-gray-700 italic">
-            {selectedStudent.averageScore >= 80
+            {displayScore >= 80
               ? `"Tuần này bé ${selectedStudent.name} đọc rất tốt, to và rõ ràng. Gia đình hãy tiếp tục động viên bé phát huy nhé!"`
-              : `"Bé ${selectedStudent.name} cần luyện đọc thêm ở nhà, đặc biệt là các dấu thanh. Nhờ phụ huynh dành 15 phút mỗi tối để cùng bé luyện tập."`
+              : `"Bé ${selectedStudent.name} cần luyện đọc thêm ở nhà. Nhờ phụ huynh dành 15 phút mỗi tối để cùng bé luyện tập."`
             }
           </p>
 

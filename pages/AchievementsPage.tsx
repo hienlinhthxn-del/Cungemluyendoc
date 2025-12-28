@@ -3,12 +3,14 @@ import { MOCK_STUDENTS } from '../constants';
 import { ACHIEVEMENTS } from './achievements';
 import { Lock, Share2 } from 'lucide-react';
 import { playClick } from '../services/audioService';
+import { getStudents } from '../services/studentService';
 
 export const AchievementsPage: React.FC = () => {
     const [isLoaded, setIsLoaded] = useState(false);
 
     // Simulate logged-in student
-    const currentStudent = MOCK_STUDENTS[0];
+    const currentStudentId = localStorage.getItem('current_student_id');
+    const currentStudent = getStudents().find(s => s.id === currentStudentId) || MOCK_STUDENTS[0];
 
     useEffect(() => {
         // Trigger animation after component mounts

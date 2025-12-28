@@ -41,7 +41,7 @@ export const LeaderboardPage: React.FC = () => {
             .slice(0, 5);
     }, [students]);
 
-    const PoduimItem = ({ student, rank, type }: { student: StudentStats, rank: number, type: 'score' | 'diligent' | 'speed' }) => {
+    const PoduimItem = ({ student, rank, type }: { student: StudentStats, rank: number, type: 'score' | 'diligent' | 'speed', key?: any }) => {
         let icon = <Trophy className="w-6 h-6 text-yellow-500" />;
         let bgColor = "bg-yellow-50";
         let borderColor = "border-yellow-200";

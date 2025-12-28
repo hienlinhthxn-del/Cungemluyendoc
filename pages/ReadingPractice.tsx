@@ -1,14 +1,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LESSONS, MOCK_STUDENTS } from '../constants';
+import { getLessons } from '../services/lessonService';
 import { evaluateReading } from '../services/geminiService';
 import { playClick, playSuccess, playFanfare, playError } from '../services/audioService';
-import { Mic, Square, RefreshCcw, Volume2, ArrowLeft, Award, AlertCircle, MessageSquare, CheckCircle2, Edit3, Loader2, BrainCircuit, X, Activity, Share2, Clock } from 'lucide-react';
-import { GeminiFeedbackSchema } from '../types';
+import { Mic, Square, RefreshCcw, Volume2, ArrowLeft, Award, AlertCircle, MessageSquare, CheckCircle2, Edit3, Loader2, BrainCircuit, X, Activity, Share2, Clock, Check } from 'lucide-react';
+import { GeminiFeedbackSchema, Lesson } from '../types';
 import { ACHIEVEMENTS, Achievement } from './achievements';
 import { saveCommunication } from '../services/communicationService';
-import { saveStudentResult } from '../services/studentService';
+import { saveStudentResult, getStudents } from '../services/studentService';
 
 const READING_LIMIT_SECONDS = 900; // 15 minutes
 const QUIZ_LIMIT_SECONDS = 300; // 5 minutes
@@ -16,13 +16,17 @@ const QUIZ_LIMIT_SECONDS = 300; // 5 minutes
 export const ReadingPractice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const lesson = LESSONS.find(l => l.id === id);
-
+  
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [isLoadingLesson, setIsLoadingLesson] = useState(true);
+  
   const [isRecording, setIsRecording] = useState(false);
   const [spokenText, setSpokenText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState<string | null>(null); // Track uploading state
   const [result, setResult] = useState<GeminiFeedbackSchema | null>(null);
+  // Notification State
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
   // Audio state for Student Recording
   const [supportedMimeType, setSupportedMimeType] = useState<string>('');
@@ -70,6 +74,21 @@ export const ReadingPractice: React.FC = () => {
   const [isReadingUnlimited, setIsReadingUnlimited] = useState(false);
   const [isQuizUnlimited, setIsQuizUnlimited] = useState(false);
 
+  // Fetch the specific lesson from the server-synced list
+  useEffect(() => {
+    const fetchLesson = async () => {
+      if (!id) {
+        setIsLoadingLesson(false);
+        return;
+      }
+      const allLessons = await getLessons();
+      const foundLesson = allLessons.find(l => l.id === id);
+      setLesson(foundLesson || null);
+      setIsLoadingLesson(false);
+    };
+    fetchLesson();
+  }, [id]);
+
   // Load Assignment Config
   useEffect(() => {
     if (lesson?.id) {
@@ -102,6 +121,14 @@ export const ReadingPractice: React.FC = () => {
       }
     }
   }, [lesson?.id]);
+
+  // Clear notification after 5s
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // Refs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -345,7 +372,7 @@ export const ReadingPractice: React.FC = () => {
         playFanfare();
 
         const currentStudentId = localStorage.getItem('current_student_id');
-        const student = MOCK_STUDENTS.find(s => s.id === currentStudentId);
+        const student = getStudents().find(s => s.id === currentStudentId);
 
         if (student) {
           saveCommunication({
@@ -372,7 +399,10 @@ export const ReadingPractice: React.FC = () => {
   const checkAndAwardAchievements = (context: any) => {
     // Simulate fetching and updating student data
     // In a real app, this would be an API call.
-    const currentStudent = MOCK_STUDENTS[0]; // Assuming student is logged in
+    const currentStudentId = localStorage.getItem('current_student_id');
+    const currentStudent = getStudents().find(s => s.id === currentStudentId);
+
+    if (!currentStudent) return;
 
     const awarded: Achievement[] = [];
     ACHIEVEMENTS.forEach(achievement => {
@@ -692,6 +722,118 @@ export const ReadingPractice: React.FC = () => {
     }
   };
 
+  /**
+   * NEW HELPER: Uploads student audio blob to the server.
+   * This is similar to the teacher's `uploadAndSaveAudio` function.
+   * @returns The permanent URL of the uploaded file, or null on failure.
+   */
+  const uploadStudentAudio = async (blob: Blob, part: 'phoneme' | 'word' | 'reading'): Promise<string | null> => {
+    if (!lesson?.id) return null;
+
+    const formData = new FormData();
+    const ext = supportedMimeType.includes('mp4') ? 'mp4' : 'webm';
+    const currentStudentId = localStorage.getItem('current_student_id');
+    // Create a unique key that the server can use. This also helps identify the file on Cloudinary.
+    const uniqueKey = `student_${currentStudentId}_${lesson.id}_${part}_${Date.now()}`;
+    const fileName = `${uniqueKey}.${ext}`;
+
+    formData.append('audioFile', blob, fileName);
+    formData.append('lessonId', lesson.id);
+    // The 'custom-audio' endpoint expects a 'text' field to use as a key. We provide a unique one.
+    formData.append('text', uniqueKey);
+
+    try {
+      // We use a generic endpoint, assuming the server can handle it.
+      // This could be the same as the teacher's custom audio endpoint.
+      const response = await fetch(`/api/lessons/${lesson.id}/custom-audio`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Server trả về lỗi không phải JSON' }));
+        throw new Error(errorData.details || errorData.error || 'Server từ chối yêu cầu tải file.');
+      }
+      const data = await response.json();
+      return data.audioUrl; // Expects { audioUrl: '...' }
+    } catch (error) {
+      console.error("Student audio upload failed:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
+      // Update the notification to be more specific
+      setNotification({ message: `Lỗi tải file ghi âm: ${errorMessage}`, type: 'error' });
+      return null;
+    }
+  };
+  /**
+   * NEW: Saves result for a specific part (phoneme, word, reading)
+   * - Creates a local audio URL for immediate playback.
+   * - Updates the student's history in localStorage.
+   * - Recalculates the total score.
+   * NOTE: `URL.createObjectURL` is temporary. For persistent storage, the blob
+   * needs to be uploaded to a server, and the returned URL should be saved.
+   */
+  const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined) => {
+    if (!lesson || !audioBlob) return;
+
+    const currentStudentId = localStorage.getItem('current_student_id');
+    if (!currentStudentId) return;
+
+    // --- MODIFIED: UPLOAD AUDIO AND GET PERMANENT URL ---
+    // The `isProcessing` overlay is already active from `handleEvaluate`.
+    const permanentAudioUrl = await uploadStudentAudio(audioBlob, part);
+    if (!permanentAudioUrl) {
+      console.error(`Upload failed for part: ${part}. Result saved without audio.`);
+      // We still save the score, but the audio URL will be missing.
+    }
+    // --- END MODIFICATION ---
+
+    const allStudents = getStudents();
+    const studentIndex = allStudents.findIndex(s => s.id === currentStudentId);
+    if (studentIndex === -1) return;
+    
+    const student = allStudents[studentIndex];
+    let historyRecord = student.history.find(h => h.week === lesson.week);
+
+    // Create a temporary, local URL for the audio.
+    const audioUrl = URL.createObjectURL(audioBlob);
+    blobsRef.current.push(audioUrl); // Keep track to revoke later
+
+    const partScoreKey = `${part}Score`;
+    const partAudioKey = `${part}AudioUrl`;
+
+    if (historyRecord) {
+      // Update existing record
+      (historyRecord as any)[partScoreKey] = score;
+      if (permanentAudioUrl) {
+        (historyRecord as any)[partAudioKey] = permanentAudioUrl;
+      }
+    } else {
+      // Create new record for the week
+      historyRecord = {
+        week: lesson.week,
+        score: 0, // Will be recalculated
+        speed: 0,
+        [partScoreKey]: score,
+        [partAudioKey]: audioUrl,
+      };
+      if (permanentAudioUrl) {
+        (historyRecord as any)[partAudioKey] = permanentAudioUrl;
+      }
+      student.history.push(historyRecord);
+    }
+
+    // Recalculate total score (simple average of parts that have a score)
+    const scores = [historyRecord.phonemeScore, historyRecord.wordScore, historyRecord.readingScore].filter((s): s is number => typeof s === 'number');
+    historyRecord.score = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : score;
+    historyRecord.speed = Math.max(historyRecord.speed || 0, readingSpeed); // Keep the highest speed
+
+    // Save back to localStorage
+    allStudents[studentIndex] = student;
+    localStorage.setItem('app_students_data', JSON.stringify(allStudents));
+
+    // Notify other components (like TeacherDashboard) to refresh
+    window.dispatchEvent(new CustomEvent('students_updated'));
+  };
+
   const handleEvaluate = async (overrideTargetText?: string, overrideAudioBlob?: Blob) => {
     if (!lesson) return;
     setIsProcessing(true);
@@ -720,11 +862,35 @@ export const ReadingPractice: React.FC = () => {
 
       setEvaluatedText(targetText);
 
+      // BƯỚC 1: GỌI AI CHẤM ĐIỂM
       const feedback = await evaluateReading(targetText, textToGrade, audioBase64, supportedMimeType);
+
+      // BƯỚC 2: HIỂN THỊ KẾT QUẢ NGAY LẬP TỨC (Không chờ lưu file)
       setResult(feedback);
 
+      // BƯỚC 3: LƯU KẾT QUẢ (LOGIC MỚI)
       const currentStudentId = localStorage.getItem('current_student_id');
-      const student = MOCK_STUDENTS.find(s => s.id === currentStudentId);
+      if (currentStudentId) {
+        if (partialTargetRef.current && blobToProcess) {
+          // This was a partial recording (Âm, Vần, Từ...)
+          let partKey: 'phoneme' | 'word' | 'reading' | null = null;
+          const label = partialTargetRef.current.label;
+          if (label.includes('Âm') || label.includes('Vần')) partKey = 'phoneme';
+          else if (label.includes('Từ')) partKey = 'word';
+          else if (label.includes('Đoạn')) partKey = 'reading';
+
+          if (partKey) {
+            await savePartialStudentResult(partKey, feedback.score, feedback.reading_speed || 0, blobToProcess);
+          }
+        } else if (blobToProcess) {
+          // This was a full recording, treat it as "Đoạn Văn"
+          await savePartialStudentResult('reading', feedback.score, feedback.reading_speed || 0, blobToProcess);
+        }
+      }
+
+      setPartialRecordingId(null); // Reset trạng thái nút ghi âm
+      
+      const student = getStudents().find(s => s.id === currentStudentId);
 
       if (student) {
         saveCommunication({
@@ -739,17 +905,8 @@ export const ReadingPractice: React.FC = () => {
         });
       }
 
-      // --- FIX: Only now clear the partial recording state ---
       // Check for achievements based on score
       checkAndAwardAchievements({ score: feedback.score });
-
-      // Simulate lesson completion
-      if (student) {
-        student.completedLessons = Math.max(student.completedLessons, parseInt(lesson.id.replace('w', ''), 10)); // Extract week number safely
-        // WAIT for upload to finish before showing success to ensure Link is saved
-        await saveStudentResult(student.id, lesson.week, feedback.score, feedback.reading_speed || 0, blobToProcess);
-      }
-      setPartialRecordingId(null);
 
       if (feedback.score >= 80) {
         playFanfare();
@@ -760,8 +917,22 @@ export const ReadingPractice: React.FC = () => {
       }
 
     } catch (error) {
-      console.error(error);
-      alert("Có lỗi xảy ra khi chấm điểm.");
+      console.error("Lỗi chi tiết khi chấm điểm:", error);
+
+      let errorMessage = "Có lỗi kết nối khi chấm điểm. Vui lòng thử lại!";
+      if (error instanceof Error) {
+        // Cung cấp thông báo lỗi cụ thể hơn cho người dùng
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = "Lỗi mạng: Không thể kết nối đến server chấm điểm. Vui lòng kiểm tra kết nối internet và thử lại.";
+        } else if (error.message.toLowerCase().includes('api key')) {
+          errorMessage = "Lỗi Cấu Hình: API Key của dịch vụ AI bị thiếu hoặc không hợp lệ trên server. Vui lòng báo quản trị viên.";
+        } else {
+          // Hiển thị lỗi trực tiếp từ server nếu có
+          errorMessage = `Lỗi khi chấm điểm: ${error.message}. Vui lòng thử lại.`;
+        }
+      }
+
+      alert(errorMessage);
       playError();
       setPartialRecordingId(null);
     } finally {
@@ -873,10 +1044,31 @@ export const ReadingPractice: React.FC = () => {
     });
   };
 
+  if (isLoadingLesson) {
+    return <div className="p-10 text-center text-gray-500">
+      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+      Đang tải bài học...
+    </div>;
+  }
   if (!lesson) return <div className="p-10 text-center">Không tìm thấy bài học</div>;
 
   return (
     <div className="max-w-4xl mx-auto pb-20 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-[100] px-6 py-4 rounded-xl shadow-2xl animate-fade-in-left flex items-center gap-3 ${notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-500 text-white'
+          }`}>
+          {notification.type === 'success' ? <Check className="w-6 h-6" /> : <X className="w-6 h-6" />}
+          <div>
+            <p className="font-bold text-lg">Thông báo</p>
+            <p className="text-sm opacity-90">{notification.message}</p>
+          </div>
+          <button onClick={() => setNotification(null)} className="ml-4 p-1 hover:bg-white/20 rounded-full transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <button
           onClick={() => {
@@ -1183,7 +1375,7 @@ export const ReadingPractice: React.FC = () => {
         <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center">
           <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center animate-scale-in">
             <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-            <p className="font-bold text-gray-800">Cô giáo đang chấm điểm...</p>
+            <p className="font-bold text-gray-800">Cô giáo đang chấm điểm và lưu bài...</p>
           </div>
         </div>
       )}
