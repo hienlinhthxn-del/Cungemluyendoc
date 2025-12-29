@@ -41,6 +41,14 @@ if (fs.existsSync('.env')) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// --- DEBUG: Print critical environment variables at startup ---
+console.log("--- Environment Variable Check (Render Debug) ---");
+console.log(`- MONGODB_URI is set: ${!!process.env.MONGODB_URI}`);
+// Log only a small, non-sensitive part of the URI to confirm it's there
+console.log(`- MONGODB_URI value (first 5 chars): ${process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 5) + '...' : 'Not Set'}`);
+console.log(`- CLOUDINARY_CLOUD_NAME is set: ${!!process.env.CLOUDINARY_CLOUD_NAME}`);
+console.log("-------------------------------------------------");
+
 console.log("-----------------------------------------");
 console.log("=== KIEM TRA PHIEN BAN MOI === (UPDATED)");
 console.log("STARTING FULL SERVER (ES MODULE)...");
@@ -118,8 +126,29 @@ const connectDB = async () => {
     try {
         const uri = process.env.MONGODB_URI;
         if (uri) {
-            await mongoose.connect(uri);
-            console.log("✅ MongoDB Connected Successfully!");
+            // --- Logic kết nối nâng cao với các trình theo dõi sự kiện ---
+            // Các trình theo dõi này sẽ giúp chúng ta gỡ lỗi khi mất kết nối.
+            mongoose.connection.on('connected', () => {
+                console.log('✅ Mongoose đã kết nối thành công với cơ sở dữ liệu.');
+            });
+
+            mongoose.connection.on('error', (err) => {
+                console.error('❌ Lỗi kết nối Mongoose sau khi kết nối ban đầu:', err);
+            });
+
+            mongoose.connection.on('disconnected', () => {
+                console.warn('⚠️ Mất kết nối Mongoose. Ứng dụng sẽ cố gắng kết nối lại.');
+            });
+
+            // Đối với Mongoose 6+, hầu hết các tùy chọn được xử lý mặc định.
+            // Các tùy chọn này có thể giúp ổn định trên các nền tảng đám mây.
+            const options = {
+                serverSelectionTimeoutMS: 30000, // Tiếp tục cố gắng chọn máy chủ trong 30 giây
+                socketTimeoutMS: 45000, // Đóng socket sau 45 giây không hoạt động
+            };
+
+            await mongoose.connect(uri, options);
+            // Trình theo dõi sự kiện 'connected' bây giờ sẽ ghi lại thông báo thành công.
         } else {
             console.warn("⚠️ MONGODB_URI missing. ACTIVATING CLOUDINARY-DB MODE.");
             // If Cloudinary configured, try to load data
@@ -129,7 +158,7 @@ const connectDB = async () => {
             }
         }
     } catch (error) {
-        console.error("❌ MongoDB Connection Error:", error);
+        console.error("❌ Lỗi kết nối MongoDB ban đầu:", error);
     }
 };
 
@@ -139,6 +168,13 @@ let upload = null;
 const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
 const apiKey = process.env.CLOUDINARY_API_KEY;
 const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+// --- DEBUG: Check if environment variables are loaded ---
+console.log("--- Cloudinary Env Var Check ---");
+console.log(`- CLOUDINARY_CLOUD_NAME is set: ${!!cloudName}`);
+console.log(`- CLOUDINARY_API_KEY is set:    ${!!apiKey}`);
+console.log(`- CLOUDINARY_API_SECRET is set: ${!!apiSecret}`);
+console.log("--------------------------------");
 
 if (cloudName && apiKey && apiSecret) {
     cloudinary.config({
@@ -304,6 +340,11 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
             ? audioFile.secure_url.replace('http:', 'https:')
             : audioFile.secure_url;
     }
+
+    // --- DEBUGGING STEP: Log the connection state right before use ---
+    console.log(`[SUBMISSION] API called. Checking DB connection state...`);
+    console.log(`- mongoose.connection.readyState: ${mongoose.connection.readyState} (1 = connected, 0 = disconnected)`);
+    // --- END DEBUGGING STEP ---
 
     const useMongo = mongoose.connection.readyState === 1;
     const audioUrlKey = `${part}AudioUrl`;

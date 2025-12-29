@@ -840,7 +840,7 @@ export const TeacherDashboard: React.FC = () => {
                 <th className="px-4 py-4 text-center bg-blue-50/50">Âm / Vần</th>
                 <th className="px-4 py-4 text-center bg-yellow-50/50">Từ Ngữ</th>
                 <th className="px-4 py-4 text-center bg-green-50/50">Đoạn Văn</th>
-                <th className="px-6 py-4 text-center">Tổng Kết</th>
+                <th className="px-6 py-4 text-center">Điểm TB</th>
                 <th className="px-6 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
@@ -891,50 +891,10 @@ export const TeacherDashboard: React.FC = () => {
                       </div>
                     </td>
                     
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex flex-col items-center">
-                        <span className={`font-bold text-lg ${student.currentScore >= 80 ? 'text-green-600' : student.currentScore >= 50 ? 'text-blue-600' : 'text-red-500'}`}>
-                          {student.currentScore > 0 ? student.currentScore : '-'}
-                        </span>
-                        <span className="text-[10px] text-gray-500">
-                          Tốc độ: {student.currentSpeed || '-'}
-                        </span>
-                      </div>
-                      {(student.currentScore > 0 || hasAnyAudio) ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <button
-                            onClick={() => handlePlayRecording(student)}
-                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${playingStudentId === student.id
-                              ? 'bg-green-100 text-green-700 ring-2 ring-green-400'
-                              : hasAnyAudio
-                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                              }`}
-                            title={mainAudioUrl ? "Phát file ghi âm tổng" : "Không có file tổng - Phát mô phỏng"}
-                          >
-                            {playingStudentId === student.id ? (
-                              <>
-                                <StopCircle className="w-3 h-3 animate-pulse" /> Đang phát...
-                              </>
-                            ) : (
-                              <>
-                                <PlayCircle className="w-3 h-3" /> {mainAudioUrl ? "Nghe Tổng" : "Mô Phỏng"}
-                              </>
-                            )}
-                          </button>
-                          {!mainAudioUrl && <span className="text-[10px] text-red-500 font-bold">⚠ Thiếu file tổng</span>}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic mb-1 block">Chưa nộp</span>
-                      )}
-
-                      <button
-                        onClick={() => handleUploadClick(student.id)} // This is for the main audio file
-                        className="mt-1 text-[10px] flex items-center gap-1 text-gray-500 hover:text-blue-600 bg-gray-50 px-2 py-1 rounded border border-gray-200 mx-auto"
-                        title="Tải lên file ghi âm cho học sinh này"
-                      >
-                        <Upload className="w-3 h-3" /> {mainAudioUrl ? 'Sửa file' : 'Tải file'}
-                      </button>
+                    <td className="px-6 py-4 text-center align-middle">
+                      <span className={`font-bold text-xl ${student.currentScore >= 80 ? 'text-green-600' : student.currentScore >= 50 ? 'text-blue-600' : 'text-red-500'}`}>
+                        {student.currentScore > 0 ? student.currentScore : '-'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">

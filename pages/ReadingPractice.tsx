@@ -775,59 +775,68 @@ export const ReadingPractice: React.FC = () => {
    * needs to be uploaded to a server, and the returned URL should be saved.
    */
   const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined) => {
-    if (!lesson || !audioBlob) return;
-
-    const currentStudentId = localStorage.getItem('current_student_id');
-    if (!currentStudentId) return;
-
-    // Tải file ghi âm lên server để lấy đường dẫn (URL) vĩnh viễn
-    const permanentAudioUrl = await uploadStudentAudio(audioBlob, part);
-    if (!permanentAudioUrl) {
-      console.error(`Tải file thất bại cho phần: ${part}. Kết quả sẽ được lưu mà không có file ghi âm.`);
-      // Thông báo lỗi đã được xử lý bên trong uploadStudentAudio
-    }
-
-    const allStudents = getStudents();
-    const studentIndex = allStudents.findIndex(s => s.id === currentStudentId);
-    if (studentIndex === -1) return;
-
-    const student = allStudents[studentIndex];
-    let historyRecord = student.history.find(h => h.week === lesson.week);
-
-    const partScoreKey = `${part}Score`;
-    const partAudioKey = `${part}AudioUrl`;
-
-    if (historyRecord) {
-      // Cập nhật bản ghi đã có
-      (historyRecord as any)[partScoreKey] = score;
-      // Chỉ cập nhật URL nếu tải lên thành công
-      if (permanentAudioUrl) {
-        (historyRecord as any)[partAudioKey] = permanentAudioUrl;
-      }
-    } else {
-      // Tạo bản ghi mới cho tuần này
-      historyRecord = {
-        week: lesson.week,
-        score: 0, // Sẽ được tính lại ở dưới
-        speed: 0,
-        [partScoreKey]: score,
-        // Chỉ thêm trường audioUrl nếu tải lên thành công
-        ...(permanentAudioUrl && { [partAudioKey]: permanentAudioUrl }),
-      };
-      student.history.push(historyRecord);
-    }
-
-    // Tính lại tổng điểm (trung bình cộng của các phần đã có điểm)
-    const scores = [historyRecord.phonemeScore, historyRecord.wordScore, historyRecord.readingScore].filter((s): s is number => typeof s === 'number');
-    historyRecord.score = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : score;
-    historyRecord.speed = Math.max(historyRecord.speed || 0, readingSpeed); // Keep the highest speed
-
-    // Save back to localStorage
-    allStudents[studentIndex] = student;
-    localStorage.setItem('app_students_data', JSON.stringify(allStudents));
-
-    // Notify other components (like TeacherDashboard) to refresh
-    window.dispatchEvent(new CustomEvent('students_updated'));
+     if (!lesson || !audioBlob) return;
+ 
+     const currentStudentId = localStorage.getItem('current_student_id');
+     if (!currentStudentId) return;
+ 
+     // Cố gắng tải file lên server, nhưng không để lỗi này làm gián đoạn việc lưu điểm.
+     let audioUrlToSave: string | null = null;
+     try {
+       const permanentAudioUrl = await uploadStudentAudio(audioBlob, part);
+       if (permanentAudioUrl) {
+         audioUrlToSave = permanentAudioUrl;
+       } else {
+         // Nếu tải lên thất bại, tạo một URL cục bộ tạm thời làm phương án dự phòng.
+         console.warn(`Tải file thất bại cho phần: ${part}. Sẽ lưu tạm URL cục bộ.`);
+         const localUrl = URL.createObjectURL(audioBlob);
+         blobsRef.current.push(localUrl); // Theo dõi để dọn dẹp sau
+         audioUrlToSave = localUrl;
+       }
+     } catch (uploadError) {
+       console.error(`Lỗi nghiêm trọng khi tải file cho phần ${part}:`, uploadError);
+       // Ngay cả khi có lỗi nghiêm trọng, vẫn lưu URL cục bộ.
+       const localUrl = URL.createObjectURL(audioBlob);
+       blobsRef.current.push(localUrl);
+       audioUrlToSave = localUrl;
+       setNotification({ message: `Lỗi tải file, đã lưu tạm kết quả.`, type: 'error' });
+     }
+ 
+     const allStudents = getStudents();
+     const studentIndex = allStudents.findIndex(s => s.id === currentStudentId);
+     if (studentIndex === -1) return;
+ 
+     const student = allStudents[studentIndex];
+     let historyRecord = student.history.find(h => h.week === lesson.week);
+ 
+     const partScoreKey = `${part}Score`;
+     const partAudioKey = `${part}AudioUrl`;
+ 
+     if (historyRecord) {
+       // Cập nhật bản ghi đã có
+       (historyRecord as any)[partScoreKey] = score;
+       if (audioUrlToSave) (historyRecord as any)[partAudioKey] = audioUrlToSave;
+     } else {
+       // Tạo bản ghi mới cho tuần này
+       historyRecord = {
+         week: lesson.week, score: 0, speed: 0,
+         [partScoreKey]: score,
+         ...(audioUrlToSave && { [partAudioKey]: audioUrlToSave }),
+       };
+       student.history.push(historyRecord);
+     }
+ 
+     // Tính lại tổng điểm (trung bình cộng của các phần đã có điểm)
+     const scores = [historyRecord.phonemeScore, historyRecord.wordScore, historyRecord.readingScore].filter((s): s is number => typeof s === 'number');
+     historyRecord.score = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : score;
+     historyRecord.speed = Math.max(historyRecord.speed || 0, readingSpeed); // Giữ lại tốc độ cao nhất
+ 
+     // Lưu lại vào localStorage
+     allStudents[studentIndex] = student;
+     localStorage.setItem('app_students_data', JSON.stringify(allStudents));
+ 
+     // Thông báo cho các component khác (như TeacherDashboard) để làm mới
+     window.dispatchEvent(new CustomEvent('students_updated'));
   };
 
   const handleEvaluate = async (overrideTargetText?: string, overrideAudioBlob?: Blob) => {
@@ -928,7 +937,7 @@ export const ReadingPractice: React.FC = () => {
         }
       }
 
-      alert(errorMessage);
+      setNotification({ message: errorMessage, type: 'error' });
       playError();
       setPartialRecordingId(null);
     } finally {
