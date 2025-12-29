@@ -9,7 +9,6 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import * as xlsx from 'xlsx';
 import dotenv from 'dotenv'; // Load env vars
-import 'express-async-errors'; // Quan trọng: Phải import trước các route của bạn
 
 // Import modular routes
 import studentRoutes from './studentRoutes.js';

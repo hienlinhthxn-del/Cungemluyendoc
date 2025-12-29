@@ -42,7 +42,7 @@ export default (localClasses, saveClassesToCloud) => {
             createdAt: new Date()
         };
 
-        if (await classExists(value.id)) {
+        if (await classExists(id)) {
             return res.status(400).json({ error: 'Mã lớp đã tồn tại' });
         }
 
