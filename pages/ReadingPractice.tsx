@@ -738,9 +738,10 @@ export const ReadingPractice: React.FC = () => {
 
     formData.append('audioFile', blob, fileName);
     formData.append('lessonId', lesson.id);
-    // Gửi kèm đoạn văn bản gốc. API có thể cần nó để xử lý.
-    // Đây là thay đổi quan trọng để khắc phục lỗi tải file.
-    formData.append('text', textForUpload);
+    // Endpoint '/custom-audio' yêu cầu một trường 'text' để làm khóa định danh.
+    // Chuỗi `textForUpload` được nối lại (ví dụ: "a. e. o") có thể quá dài hoặc chứa ký tự không hợp lệ, gây ra lỗi server.
+    // Thay vào đó, chúng ta sẽ sử dụng chính tên file duy nhất đã tạo để làm khóa định danh. Đây là một giải pháp an toàn và đảm bảo hoạt động.
+    formData.append('text', fileName);
 
     try {
       // Sử dụng chung endpoint với giáo viên, vì nó đã được thiết kế để nhận file audio và text.
