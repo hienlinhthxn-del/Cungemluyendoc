@@ -108,8 +108,10 @@ export const TeacherDashboard: React.FC = () => {
     loadData();
     window.addEventListener('students_updated', loadData);
 
-    // Initial Sync with Server
-    syncWithServer(classId);
+    // CHẨN ĐOÁN: Tạm thời vô hiệu hóa việc tự động đồng bộ khi tải trang.
+    // Việc này giúp ngăn dữ liệu mới trên máy bị dữ liệu cũ từ server ghi đè.
+    // Bạn có thể bật lại dòng này sau khi logic đồng bộ được cải thiện, hoặc chỉ đồng bộ khi nhấn nút "Làm mới".
+    // syncWithServer(classId);
 
     return () => window.removeEventListener('students_updated', loadData);
   }, [classId]);

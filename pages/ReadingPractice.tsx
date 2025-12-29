@@ -775,30 +775,41 @@ export const ReadingPractice: React.FC = () => {
    * needs to be uploaded to a server, and the returned URL should be saved.
    */
   const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined) => {
-     if (!lesson || !audioBlob) return;
+     if (!lesson || !audioBlob) return; // Nếu không có bài học hoặc file âm thanh thì không làm gì cả
  
      const currentStudentId = localStorage.getItem('current_student_id');
-     if (!currentStudentId) return;
+     if (!currentStudentId) return; // Cần biết đang lưu bài cho học sinh nào
  
-     // Cố gắng tải file lên server, nhưng không để lỗi này làm gián đoạn việc lưu điểm.
+     // Cố gắng tải file lên server. Nếu thất bại, chuyển audio sang Base64 để lưu tạm.
      let audioUrlToSave: string | null = null;
      try {
        const permanentAudioUrl = await uploadStudentAudio(audioBlob, part);
        if (permanentAudioUrl) {
          audioUrlToSave = permanentAudioUrl;
        } else {
-         // Nếu tải lên thất bại, tạo một URL cục bộ tạm thời làm phương án dự phòng.
-         console.warn(`Tải file thất bại cho phần: ${part}. Sẽ lưu tạm URL cục bộ.`);
-         const localUrl = URL.createObjectURL(audioBlob);
-         blobsRef.current.push(localUrl); // Theo dõi để dọn dẹp sau
-         audioUrlToSave = localUrl;
+         // Nếu tải lên thất bại, chuyển sang Base64 để lưu trữ bền vững trên trình duyệt.
+         console.warn(`Tải file thất bại cho phần: ${part}. Sẽ lưu tạm dưới dạng Base64.`);
+         audioUrlToSave = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = (error) => reject(error);
+         });
        }
      } catch (uploadError) {
        console.error(`Lỗi nghiêm trọng khi tải file cho phần ${part}:`, uploadError);
-       // Ngay cả khi có lỗi nghiêm trọng, vẫn lưu URL cục bộ.
-       const localUrl = URL.createObjectURL(audioBlob);
-       blobsRef.current.push(localUrl);
-       audioUrlToSave = localUrl;
+       // Ngay cả khi có lỗi nghiêm trọng, vẫn cố gắng lưu dưới dạng Base64.
+       try {
+         audioUrlToSave = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = (error) => reject(error);
+         });
+       } catch (base64Error) {
+         console.error('Không thể chuyển đổi audio sang Base64', base64Error);
+         audioUrlToSave = null; // Không thể lưu audio
+       }
        setNotification({ message: `Lỗi tải file, đã lưu tạm kết quả.`, type: 'error' });
      }
  
