@@ -162,30 +162,9 @@ export const TeacherDashboard: React.FC = () => {
     return classStudents.map(s => {
       const weekRecord = s.history.find(h => h.week === selectedWeek);
 
-      // Tính điểm trung bình của các phần nhỏ (Âm, Từ, Đoạn văn)
-      const partialScores = [
-        weekRecord?.phonemeScore,
-        weekRecord?.wordScore,
-        weekRecord?.readingScore
-      ].filter((score): score is number => typeof score === 'number');
-
-      const averageScore = partialScores.length > 0
-        ? Math.round(partialScores.reduce((a, b) => a + b, 0) / partialScores.length)
-        : (weekRecord ? weekRecord.score : 0); // Giữ lại điểm cũ nếu không có điểm thành phần
-
-      return {
-        ...s,
-        weekRecord: weekRecord || null,
-        currentScore: averageScore,
-        currentSpeed: weekRecord ? weekRecord.speed : '-',
-      };
-    });
-  }, [students, selectedWeek, classId]);
-
-  const chartData = weekData.map(s => ({
+      eehartData = weekData.map(s => ({
     name: s.name.split(' ').pop(), // Last name
     score: s.currentScore,
-  }));
 
   // --- Class Management Logic ---
   const handleCreateClass = async () => {

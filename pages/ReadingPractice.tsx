@@ -775,6 +775,9 @@ export const ReadingPractice: React.FC = () => {
    * needs to be uploaded to a server, and the returned URL should be saved.
    */
   const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined) => {
+    // GIỚI HẠN KÍCH THƯỚC LƯU TRỮ TẠM THỜI
+    const MAX_BLOB_SIZE_FOR_BASE64 = 3 * 1024 * 1024; // 3MB
+
      if (!lesson || !audioBlob) return; // Nếu không có bài học hoặc file âm thanh thì không làm gì cả
  
      const currentStudentId = localStorage.getItem('current_student_id');
@@ -787,14 +790,20 @@ export const ReadingPractice: React.FC = () => {
        if (permanentAudioUrl) {
          audioUrlToSave = permanentAudioUrl;
        } else {
-         // Nếu tải lên thất bại, chuyển sang Base64 để lưu trữ bền vững trên trình duyệt.
-         console.warn(`Tải file thất bại cho phần: ${part}. Sẽ lưu tạm dưới dạng Base64.`);
-         audioUrlToSave = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = (error) => reject(error);
-         });
+         // Nếu tải lên thất bại, chuyển sang Base64 nếu file không quá lớn.
+         if (audioBlob.size > MAX_BLOB_SIZE_FOR_BASE64) {
+            console.warn(`File ghi âm cho phần ${part} quá lớn (${(audioBlob.size / 1024 / 1024).toFixed(2)}MB) để lưu tạm. Sẽ chỉ lưu điểm.`);
+            setNotification({ message: `Ghi âm quá dài, chỉ lưu điểm số.`, type: 'error' });
+            audioUrlToSave = null;
+         } else {
+            console.warn(`Tải file thất bại cho phần: ${part}. Sẽ lưu tạm dưới dạng Base64.`);
+            audioUrlToSave = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.readAsDataURL(audioBlob);
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = (error) => reject(error);
+            });
+         }
        }
      } catch (uploadError) {
        console.error(`Lỗi nghiêm trọng khi tải file cho phần ${part}:`, uploadError);
@@ -842,12 +851,19 @@ export const ReadingPractice: React.FC = () => {
      historyRecord.score = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : score;
      historyRecord.speed = Math.max(historyRecord.speed || 0, readingSpeed); // Giữ lại tốc độ cao nhất
  
-     // Lưu lại vào localStorage
-     allStudents[studentIndex] = student;
-     localStorage.setItem('app_students_data', JSON.stringify(allStudents));
- 
-     // Thông báo cho các component khác (như TeacherDashboard) để làm mới
-     window.dispatchEvent(new CustomEvent('students_updated'));
+     try {
+        // Lưu lại vào localStorage
+        allStudents[studentIndex] = student;
+        localStorage.setItem('app_students_data', JSON.stringify(allStudents));
+        console.log(`[SAVE] Đã lưu thành công cho tuần ${lesson.week}. Dữ liệu mới:`, historyRecord);
+        // Thông báo cho các component khác (như TeacherDashboard) để làm mới
+        window.dispatchEvent(new CustomEvent('students_updated'));
+     } catch (e) {
+        console.error("LỖI LƯU VÀO LOCALSTORAGE:", e);
+        // Đây là lỗi nghiêm trọng, có thể do localStorage đầy.
+        setNotification({ message: 'Lỗi nghiêm trọng: Không thể lưu bài làm! Có thể do bộ nhớ trình duyệt đã đầy.', type: 'error' });
+        // Trong trường hợp này, không dispatch event để tránh UI bị cập nhật sai.
+     }
   };
 
   const handleEvaluate = async (overrideTargetText?: string, overrideAudioBlob?: Blob) => {
