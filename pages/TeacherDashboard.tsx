@@ -162,7 +162,21 @@ export const TeacherDashboard: React.FC = () => {
     return classStudents.map(s => {
       const weekRecord = s.history.find(h => h.week === selectedWeek);
 
-      eehartData = weekData.map(s => ({
+      // Điểm tổng kết (currentScore) được lấy trực tiếp từ bản ghi của tuần đó.
+      // Điểm này đã được tính toán và lưu lại khi học sinh nộp bài.
+      const currentScore = weekRecord?.score ?? 0;
+
+      return {
+        ...s,
+        weekRecord: weekRecord || null,
+        currentScore: currentScore,
+        currentSpeed: weekRecord ? weekRecord.speed : '-',
+      };
+    });
+  }, [students, selectedWeek, classId]);
+
+  // Chart Data
+  const chartData = weekData.map(s => ({
     name: s.name.split(' ').pop(), // Last name
     score: s.currentScore,
   }));
