@@ -727,24 +727,23 @@ export const ReadingPractice: React.FC = () => {
    * This is similar to the teacher's `uploadAndSaveAudio` function.
    * @returns The permanent URL of the uploaded file, or null on failure.
    */
-  const uploadStudentAudio = async (blob: Blob, part: 'phoneme' | 'word' | 'reading'): Promise<string | null> => {
+  const uploadStudentAudio = async (blob: Blob, part: 'phoneme' | 'word' | 'reading', textForUpload: string): Promise<string | null> => {
     if (!lesson?.id) return null;
 
     const formData = new FormData();
     const ext = supportedMimeType.includes('mp4') ? 'mp4' : 'webm';
     const currentStudentId = localStorage.getItem('current_student_id');
-    // Create a unique key that the server can use. This also helps identify the file on Cloudinary.
-    const uniqueKey = `student_${currentStudentId}_${lesson.id}_${part}_${Date.now()}`;
-    const fileName = `${uniqueKey}.${ext}`;
+    // Tạo một tên file duy nhất để tránh ghi đè trên Cloudinary
+    const fileName = `student_${currentStudentId}_${lesson.id}_${part}_${Date.now()}.${ext}`;
 
     formData.append('audioFile', blob, fileName);
     formData.append('lessonId', lesson.id);
-    // The 'custom-audio' endpoint expects a 'text' field to use as a key. We provide a unique one.
-    formData.append('text', uniqueKey);
+    // Gửi kèm đoạn văn bản gốc. API có thể cần nó để xử lý.
+    // Đây là thay đổi quan trọng để khắc phục lỗi tải file.
+    formData.append('text', textForUpload);
 
     try {
-      // We use a generic endpoint, assuming the server can handle it.
-      // This could be the same as the teacher's custom audio endpoint.
+      // Sử dụng chung endpoint với giáo viên, vì nó đã được thiết kế để nhận file audio và text.
       const response = await fetch(`/api/lessons/${lesson.id}/custom-audio`, {
         method: 'POST',
         body: formData,
@@ -771,14 +770,14 @@ export const ReadingPractice: React.FC = () => {
    * NOTE: `URL.createObjectURL` is temporary. For persistent storage, the blob
    * needs to be uploaded to a server, and the returned URL should be saved.
    */
-  const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined) => {
+  const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined, textForUpload: string) => {
     if (!lesson || !audioBlob) return;
 
     const currentStudentId = localStorage.getItem('current_student_id');
     if (!currentStudentId) return;
 
     // Tải file ghi âm lên server để lấy đường dẫn (URL) vĩnh viễn
-    const permanentAudioUrl = await uploadStudentAudio(audioBlob, part);
+    const permanentAudioUrl = await uploadStudentAudio(audioBlob, part, textForUpload);
     if (!permanentAudioUrl) {
       console.error(`Tải file thất bại cho phần: ${part}. Kết quả sẽ được lưu mà không có file ghi âm.`);
       // Thông báo lỗi đã được xử lý bên trong uploadStudentAudio
@@ -873,11 +872,11 @@ export const ReadingPractice: React.FC = () => {
           else if (label.includes('Đoạn')) partKey = 'reading';
 
           if (partKey) {
-            await savePartialStudentResult(partKey, feedback.score, feedback.reading_speed || 0, blobToProcess);
+            await savePartialStudentResult(partKey, feedback.score, feedback.reading_speed || 0, blobToProcess, partialTargetRef.current.text);
           }
         } else if (blobToProcess) {
           // This was a full recording, treat it as "Đoạn Văn"
-          await savePartialStudentResult('reading', feedback.score, feedback.reading_speed || 0, blobToProcess);
+          await savePartialStudentResult('reading', feedback.score, feedback.reading_speed || 0, blobToProcess, targetText);
         }
       }
 
