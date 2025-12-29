@@ -37,10 +37,12 @@ export const StudentDashboard: React.FC = () => {
   // Reload data when component mounts or Class ID changes
   useEffect(() => {
     if (classId) {
-      // Sync specific class data
-      syncWithServer(classId).then(() => {
-        setStudents(getStudents());
-      });
+      // Tạm thời vô hiệu hóa việc đồng bộ tự động để tránh ghi đè dữ liệu mới nhất
+      // được lưu trên máy (ví dụ: điểm của học sinh vừa làm bài).
+      // syncWithServer(classId).then(() => {
+      //   setStudents(getStudents());
+      // });
+      setStudents(getStudents()); // Chỉ cần tải từ localStorage là đủ
     } else {
       setStudents(getStudents());
     }

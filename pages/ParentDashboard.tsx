@@ -63,9 +63,11 @@ export const ParentDashboard: React.FC = () => {
     }
   }, [location.search]); // Chạy lại khi URL thay đổi
 
-  // Initial Sync for Parent (Fetch ALL students so search works)
+  // Initial Sync for Parent (Fetch ALL students so search works) - DISABLED to prevent overwriting local data
   useEffect(() => {
-    syncWithServer();
+    // Tạm thời vô hiệu hóa việc đồng bộ tự động để tránh ghi đè dữ liệu mới nhất
+    // được lưu trên máy (ví dụ: điểm của học sinh vừa làm bài).
+    // syncWithServer();
   }, []);
 
   useEffect(() => {
