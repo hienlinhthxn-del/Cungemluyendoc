@@ -312,6 +312,57 @@ app.use('/api/lessons', lessonRoutes);
 
 app.use('/api/classes', classRoutes(localClasses, saveClassesToCloud));
 
+// Route để học sinh nộp bài
+app.post('/api/submissions', uploadMiddleware, async (req, res) => {
+    const { studentId, week, part } = req.body;
+    const audioFile = req.file;
+
+    if (!studentId || !week || !part || !audioFile) {
+        return res.status(400).json({ error: 'Missing required submission data.' });
+    }
+
+    let audioUrl = audioFile.path; // Default for local storage
+    if (audioFile.secure_url) { // Cloudinary gives secure_url
+        audioUrl = audioFile.secure_url.startsWith('http:')
+            ? audioFile.secure_url.replace('http:', 'https:')
+            : audioFile.secure_url;
+    }
+
+    const useMongo = mongoose.connection.readyState === 1;
+    const audioUrlKey = `${part}AudioUrl`;
+
+    try {
+        if (useMongo) {
+            const student = await Student.findOne({ id: studentId });
+            if (!student) return res.status(404).json({ error: 'Student not found' });
+
+            let historyRecord = student.history.find(h => h.week === Number(week));
+            if (historyRecord) {
+                historyRecord[audioUrlKey] = audioUrl;
+            } else {
+                student.history.push({ week: Number(week), score: 0, speed: 0, [audioUrlKey]: audioUrl });
+            }
+            await student.save();
+        } else {
+            const studentIndex = localStudents.findIndex(s => s.id === studentId);
+            if (studentIndex === -1) return res.status(404).json({ error: 'Student not found' });
+
+            const student = localStudents[studentIndex];
+            let historyRecord = student.history.find(h => h.week === Number(week));
+            if (historyRecord) {
+                historyRecord[audioUrlKey] = audioUrl;
+            } else {
+                student.history.push({ week: Number(week), score: 0, speed: 0, [audioUrlKey]: audioUrl });
+            }
+            saveDBToCloud();
+        }
+        res.status(201).json({ success: true, audioUrl });
+    } catch (error) {
+        console.error('Error saving submission:', error);
+        res.status(500).json({ error: 'Failed to save submission.' });
+    }
+});
+
 // Health Check & Debug Info
 app.get('/api/health', (req, res) => {
     const isMongoUriSet = !!process.env.MONGODB_URI;
