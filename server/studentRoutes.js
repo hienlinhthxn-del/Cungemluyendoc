@@ -3,8 +3,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import fs from 'fs';
-
-import Student from '../models/Student.js'; // Import the single source of truth
+import Student from '../Student.js'; // Import from root directory
 
 const router = express.Router();
 

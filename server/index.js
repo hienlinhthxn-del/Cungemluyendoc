@@ -29,9 +29,9 @@ process.on('uncaughtException', (error) => {
 });
 
 // Import Models
-import Student from './models/Student.js';
-import Lesson from './models/Lesson.js';
-import ClassModel from './models/Class.js';
+import Student from '../Student.js';
+import Lesson from './Lesson.js';
+import ClassModel from './Class.js';
 
 // Helper to load env manually if not loaded (for local dev)
 if (fs.existsSync('.env')) {

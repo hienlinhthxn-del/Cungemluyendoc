@@ -1,6 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import ClassModel from '../models/Class.js';
+import ClassModel from './Class.js';
 
 const router = express.Router();
 
