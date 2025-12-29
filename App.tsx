@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { StudentDashboard } from './pages/StudentDashboard';
@@ -9,14 +9,12 @@ import { ParentDashboard } from './pages/ParentDashboard';
 import { ReportsPage } from './pages/ReportsPage';
 import { LessonManager } from './pages/LessonManagerPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
+import { ClassManagerPage } from './pages/ClassManagerPage';
 import { LostAndFoundPage } from './pages/LostAndFoundPage';
 import { UserRole } from './types';
 import { Users, GraduationCap, Baby, Lock, X, KeyRound, ChevronRight } from 'lucide-react';
 import { playClick, playError, playSuccess } from './services/audioService';
 import { initializeStudentsIfEmpty } from './services/studentService';
-
-// Initialize data
-initializeStudentsIfEmpty();
 
 const TeacherLoginModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: () => void }> = ({ isOpen, onClose, onLogin }) => {
   const [password, setPassword] = useState('');
@@ -179,8 +177,79 @@ const RoleSelector: React.FC<{ onSelect: (role: UserRole) => void }> = ({ onSele
   );
 };
 
+type ErrorBoundaryProps = {
+  children: React.ReactNode;
+  fallbackMessage: string;
+};
+
+type ErrorBoundaryState = {
+  hasError: boolean;
+  error: Error | null;
+};
+
+// Lớp bảo vệ để bắt lỗi render trong các component con
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    // Cập nhật state để lần render tiếp theo sẽ hiển thị UI dự phòng.
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Bạn cũng có thể log lỗi này tới một dịch vụ báo cáo lỗi
+    console.error("Lỗi không bắt được trong component:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Giao diện dự phòng khi có lỗi
+      return (
+        <div className="m-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-md">
+          <h2 className="font-bold text-lg mb-2">Đã có lỗi xảy ra</h2>
+          <p>{this.props.fallbackMessage}</p>
+          {/* Chỉ hiển thị chi tiết lỗi trong môi trường development */}
+          {import.meta.env.DEV && this.state.error && (
+            <pre className="mt-4 text-xs whitespace-pre-wrap bg-red-50 p-2 rounded">
+              <code>
+                {this.state.error.toString()}
+                <br />
+                {this.state.error.stack}
+              </code>
+            </pre>
+          )}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const App: React.FC = () => {
-  const [role, setRole] = useState<UserRole | null>(null);
+  // Khởi tạo state từ localStorage để ghi nhớ vai trò người dùng
+  const [role, setRole] = useState<UserRole | null>(() => {
+    const savedRole = localStorage.getItem('current_role');
+    return savedRole ? (savedRole as UserRole) : null;
+  });
+
+  // Khi role thay đổi, lưu lại vào localStorage
+  useEffect(() => {
+    if (role) {
+      localStorage.setItem('current_role', role);
+    } else {
+      // Khi đăng xuất (role là null), xoá luôn để quay về màn hình chọn vai trò
+      localStorage.removeItem('current_role');
+    }
+  }, [role]);
+
+  // Initialize data on first load
+  useEffect(() => {
+    initializeStudentsIfEmpty();
+  }, []);
+
+  const handleLogout = () => {
+    setRole(null);
+  };
 
   if (!role) {
     return <RoleSelector onSelect={setRole} />;
@@ -197,22 +266,58 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <Layout role={role} onLogout={() => setRole(null)}>
+      <Layout role={role} onLogout={handleLogout}>
         <Routes>
           <Route path="/" element={<Navigate to={getDefaultRoute()} replace />} />
 
-          <Route path="/student" element={<StudentDashboard />} />
-          <Route path="/student/practice/:id" element={<ReadingPractice />} />
-          <Route path="/student/achievements" element={<AchievementsPage />} />
+          {/* Student Routes */}
+          {role === UserRole.STUDENT && (
+            <>
+              <Route path="/student" element={<StudentDashboard />} />
+              <Route path="/student/practice/:id" element={<ReadingPractice />} />
+              <Route path="/student/achievements" element={<AchievementsPage />} />
+              <Route path="/leaderboard" element={<LeaderboardPage />} />
+            </>
+          )}
 
-          <Route path="/teacher" element={<TeacherDashboard />} />
-          <Route path="/teacher/reports" element={<ReportsPage />} />
-          <Route path="/teacher/lessons" element={<LessonManager />} />
-          <Route path="/teacher/lost-and-found" element={<LostAndFoundPage onBack={() => window.history.back()} />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          {/* Teacher Routes */}
+          {role === UserRole.TEACHER && (
+            <>
+              <Route
+                path="/teacher"
+                element={
+                  <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Giáo viên. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
+                    <TeacherDashboard />
+                  </ErrorBoundary>
+                }
+              />
+              <Route path="/teacher/reports" element={<ReportsPage />} />
+              <Route path="/teacher/lessons" element={<LessonManager />} />
+              <Route path="/teacher/classes" element={<ClassManagerPage />} />
+              <Route path="/teacher/lost-and-found" element={<LostAndFoundPage onBack={() => window.history.back()} />} />
+              <Route path="/leaderboard" element={<LeaderboardPage />} />
+              {/* Cho phép giáo viên truy cập trang luyện đọc để sửa giọng đọc mẫu */}
+              <Route path="/student/practice/:id" element={<ReadingPractice />} />
+            </>
+          )}
 
-          <Route path="/parent" element={<ParentDashboard />} />
-          <Route path="/parent/contact" element={<div className="text-center p-10 text-gray-500">Trang liên hệ đang cập nhật...</div>} />
+          {/* Parent Routes */}
+          {role === UserRole.PARENT && (
+            <>
+              <Route
+                path="/parent"
+                element={
+                  <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Phụ huynh. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
+                    <ParentDashboard />
+                  </ErrorBoundary>
+                }
+              />
+              <Route path="/parent/contact" element={<div className="text-center p-10 text-gray-500">Trang liên hệ đang cập nhật...</div>} />
+            </>
+          )}
+
+          {/* Fallback: Redirect to user's default route if they try to access a wrong page */}
+          <Route path="*" element={<Navigate to={getDefaultRoute()} replace />} />
         </Routes>
       </Layout>
     </Router>

@@ -16,7 +16,8 @@
     "strict": false,
     "ignoreDeprecations": "5.0",
     "types": [
-      "node"
+      "node",
+      "vite/client"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,

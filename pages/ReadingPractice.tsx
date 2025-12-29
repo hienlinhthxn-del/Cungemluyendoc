@@ -777,51 +777,44 @@ export const ReadingPractice: React.FC = () => {
     const currentStudentId = localStorage.getItem('current_student_id');
     if (!currentStudentId) return;
 
-    // --- MODIFIED: UPLOAD AUDIO AND GET PERMANENT URL ---
-    // The `isProcessing` overlay is already active from `handleEvaluate`.
+    // Tải file ghi âm lên server để lấy đường dẫn (URL) vĩnh viễn
     const permanentAudioUrl = await uploadStudentAudio(audioBlob, part);
     if (!permanentAudioUrl) {
-      console.error(`Upload failed for part: ${part}. Result saved without audio.`);
-      // We still save the score, but the audio URL will be missing.
+      console.error(`Tải file thất bại cho phần: ${part}. Kết quả sẽ được lưu mà không có file ghi âm.`);
+      // Thông báo lỗi đã được xử lý bên trong uploadStudentAudio
     }
-    // --- END MODIFICATION ---
 
     const allStudents = getStudents();
     const studentIndex = allStudents.findIndex(s => s.id === currentStudentId);
     if (studentIndex === -1) return;
-    
+
     const student = allStudents[studentIndex];
     let historyRecord = student.history.find(h => h.week === lesson.week);
-
-    // Create a temporary, local URL for the audio.
-    const audioUrl = URL.createObjectURL(audioBlob);
-    blobsRef.current.push(audioUrl); // Keep track to revoke later
 
     const partScoreKey = `${part}Score`;
     const partAudioKey = `${part}AudioUrl`;
 
     if (historyRecord) {
-      // Update existing record
+      // Cập nhật bản ghi đã có
       (historyRecord as any)[partScoreKey] = score;
+      // Chỉ cập nhật URL nếu tải lên thành công
       if (permanentAudioUrl) {
         (historyRecord as any)[partAudioKey] = permanentAudioUrl;
       }
     } else {
-      // Create new record for the week
+      // Tạo bản ghi mới cho tuần này
       historyRecord = {
         week: lesson.week,
-        score: 0, // Will be recalculated
+        score: 0, // Sẽ được tính lại ở dưới
         speed: 0,
         [partScoreKey]: score,
-        [partAudioKey]: audioUrl,
+        // Chỉ thêm trường audioUrl nếu tải lên thành công
+        ...(permanentAudioUrl && { [partAudioKey]: permanentAudioUrl }),
       };
-      if (permanentAudioUrl) {
-        (historyRecord as any)[partAudioKey] = permanentAudioUrl;
-      }
       student.history.push(historyRecord);
     }
 
-    // Recalculate total score (simple average of parts that have a score)
+    // Tính lại tổng điểm (trung bình cộng của các phần đã có điểm)
     const scores = [historyRecord.phonemeScore, historyRecord.wordScore, historyRecord.readingScore].filter((s): s is number => typeof s === 'number');
     historyRecord.score = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : score;
     historyRecord.speed = Math.max(historyRecord.speed || 0, readingSpeed); // Keep the highest speed

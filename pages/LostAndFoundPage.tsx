@@ -22,6 +22,7 @@ export const LostAndFoundPage: React.FC<{ onBack: () => void }> = ({ onBack }) =
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const [selectedStudent, setSelectedStudent] = useState('');
     const [selectedWeek, setSelectedWeek] = useState(1);
+    const [selectedPart, setSelectedPart] = useState<'phoneme' | 'word' | 'reading'>('reading');
 
     // Notification
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
@@ -63,22 +64,24 @@ export const LostAndFoundPage: React.FC<{ onBack: () => void }> = ({ onBack }) =
 
         setNotification({ message: 'Đang lưu bài...', type: 'success' });
         try {
-            // Save to student record
-            // Note: score/speed 0 for now, teacher can update later
-            await saveStudentResult(selectedStudent, selectedWeek, 0, 0, undefined);
+            // Xác định trường cần lưu trong database, ví dụ: 'readingAudioUrl'
+            const audioUrlKey = `${selectedPart}AudioUrl`;
 
-            // Manually force the Audio URL update (since saveStudentResult expects a blob usually)
-            // We'll use a direct API call to ensure the URL is set
-            await fetch(`/api/students/${selectedStudent}/progress`, {
+            // Gọi API để cập nhật bản ghi lịch sử của học sinh
+            const res = await fetch(`/api/students/${selectedStudent}/progress`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     week: selectedWeek,
-                    score: 0,
-                    speed: 0,
-                    audioUrl: file.url
+                    // Chỉ cập nhật URL âm thanh, không ghi đè điểm số
+                    [audioUrlKey]: file.url
                 })
             });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({ error: 'Server không phản hồi JSON' }));
+                throw new Error(errorData.error || "Server không thể xử lý yêu cầu.");
+            }
 
             setNotification({ message: 'Đã nhận bài thành công!', type: 'success' });
 
@@ -88,9 +91,9 @@ export const LostAndFoundPage: React.FC<{ onBack: () => void }> = ({ onBack }) =
             // Clear selection
             setSelectedFile(null);
 
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            setNotification({ message: 'Lỗi khi lưu bài', type: 'error' });
+            setNotification({ message: `Lỗi khi lưu bài: ${e.message}`, type: 'error' });
         }
     };
 
@@ -198,6 +201,22 @@ export const LostAndFoundPage: React.FC<{ onBack: () => void }> = ({ onBack }) =
                                         <p className="text-sm text-gray-700 break-all">{
                                             files.find(f => f.url === selectedFile)?.public_id || selectedFile
                                         }</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Loại bài đọc
+                                        </label>
+                                        <select
+                                            value={selectedPart}
+                                            onChange={(e) => setSelectedPart(e.target.value as any)}
+                                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        >
+                                            <option value="reading">Đoạn văn / Bài tổng hợp</option>
+                                            <option value="phoneme">Âm / Vần</option>
+                                            <option value="word">Từ ngữ</option>
+                                        </select>
+                                        <p className="text-xs text-gray-500 mt-1">Chọn đúng loại để file âm thanh hiển thị ở đúng cột.</p>
                                     </div>
 
                                     <div>

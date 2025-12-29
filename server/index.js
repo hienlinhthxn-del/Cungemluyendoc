@@ -9,6 +9,29 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import * as xlsx from 'xlsx';
 import dotenv from 'dotenv'; // Load env vars
+import 'express-async-errors'; // Quan trọng: Phải import trước các route của bạn
+
+// Import modular routes
+import studentRoutes from './routes/studentRoutes.js';
+import lessonRoutes from './routes/lessonRoutes.js';
+import classRoutes from './routes/classRoutes.js';
+
+// --- GLOBAL ERROR HANDLERS ---
+// These should be at the top to catch errors early.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ UNHANDLED REJECTION:', reason);
+  // Application specific logging, throwing an error, or other logic here
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ UNCAUGHT EXCEPTION:', error);
+  process.exit(1); // Mandatory exit
+});
+
+// Import Models
+import Student from './models/Student.js';
+import Lesson from './models/Lesson.js';
+import ClassModel from './models/Class.js';
 
 // Helper to load env manually if not loaded (for local dev)
 if (fs.existsSync('.env')) {
@@ -25,7 +48,7 @@ console.log("STARTING FULL SERVER (ES MODULE)...");
 console.log("-----------------------------------------");
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 10001;
 
 // --- 1. DATABASE & PERSISTENCE ---
 
@@ -39,7 +62,9 @@ let saveTimeout = null;
 const saveDBToCloud = () => {
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
-        if (!upload) return;
+        // Only sync if Cloudinary is configured
+        if (!process.env.CLOUDINARY_CLOUD_NAME) return;
+
         try {
             console.log("☁️ Syncing Database to Cloudinary...");
             const jsonString = JSON.stringify(localStudents, null, 2);
@@ -65,7 +90,9 @@ const saveDBToCloud = () => {
 
 // Helper: Load DB from Cloudinary
 const loadDBFromCloud = async () => {
-    if (!upload) return;
+    // Only sync if Cloudinary is configured
+    if (!process.env.CLOUDINARY_CLOUD_NAME) return;
+
     try {
         console.log("☁️ Fetching Database from Cloudinary...");
         // Get the URL
@@ -97,13 +124,13 @@ const connectDB = async () => {
             // If Cloudinary configured, try to load data
             if (process.env.CLOUDINARY_CLOUD_NAME) {
                 await loadDBFromCloud();
+                await loadClassesFromCloud();
             }
         }
     } catch (error) {
         console.error("❌ MongoDB Connection Error:", error);
     }
 };
-connectDB();
 
 // --- 2. CLOUDINARY CONFIG ---
 // Only config if ALL credentials exist
@@ -195,59 +222,63 @@ const LessonAudioSchema = new mongoose.Schema({
 });
 const LessonAudio = mongoose.model('LessonAudio', LessonAudioSchema);
 
-// --- 3. STUDENT & SCORE MANAGEMENT (MONGODB) ---
-const StudentSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    classId: { type: String, required: false, default: 'DEFAULT' }, // NEW: Class ID
-    name: { type: String, required: true },
-    completedLessons: { type: Number, default: 0 },
-    averageScore: { type: Number, default: 0 },
-    readingSpeed: { type: mongoose.Schema.Types.Mixed, default: 0 }, // Number or string
-    history: [{
-        week: Number,
-        score: Number,
-        speed: mongoose.Schema.Types.Mixed,
-        audioUrl: String // New field for recording
-    }],
-    badges: [String],
-    lastPractice: { type: Date, default: Date.now }
-});
-
-const Student = mongoose.models.Student || mongoose.model('Student', StudentSchema);
-
-// --- LESSON SCHEMA & MODEL ---
-const LessonSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    week: Number,
-    title: String,
-    description: String,
-    readingText: [String],
-    phonemes: [String],
-    vocabulary: [String],
-    questions: [{
-        id: String,
-        question: String,
-        options: [String],
-        correctAnswer: String
-    }]
-});
-const Lesson = mongoose.models.Lesson || mongoose.model('Lesson', LessonSchema);
-
-// --- CLASS SCHEMA & MODEL ---
-const ClassSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true }, // Class Code (e.g., "1A3_2024")
-    name: { type: String, required: true }, // Display Name (e.g., "Lớp 1A3")
-    teacherName: { type: String, default: 'Giáo viên' },
-    createdAt: { type: Date, default: Date.now }
-});
-const ClassModel = mongoose.models.Class || mongoose.model('Class', ClassSchema);
-
 // In-Memory Classes (Synced to Cloudinary/File)
 let localClasses = [
     { id: '1A3', name: 'Lớp 1A3', teacherName: 'Cô giáo', createdAt: new Date() }
 ];
-// Note: We should also sync localClasses to file/cloud if needed, similar to localStudents. 
-// For simplicity in this iteration, we initialize with a default class.
+
+const CLOUD_CLASSES_DB_PUBLIC_ID = 'reading_app_classes_backup.json';
+
+// Helper: Save Classes to Cloudinary (Debounced)
+let saveClassesTimeout = null;
+const saveClassesToCloud = () => {
+    if (saveClassesTimeout) clearTimeout(saveClassesTimeout);
+    saveClassesTimeout = setTimeout(async () => {
+        // Only sync if Cloudinary is configured
+        if (!process.env.CLOUDINARY_CLOUD_NAME) return;
+
+        try {
+            console.log("☁️ Syncing Classes to Cloudinary...");
+            const jsonString = JSON.stringify(localClasses, null, 2);
+            const tempPath = path.join(__dirname, 'temp_classes.json');
+            fs.writeFileSync(tempPath, jsonString);
+
+            await cloudinary.uploader.upload(tempPath, {
+                resource_type: 'raw',
+                public_id: CLOUD_CLASSES_DB_PUBLIC_ID,
+                overwrite: true,
+                invalidate: true
+            });
+            console.log("✅ Classes Synced to Cloudinary!");
+            fs.unlinkSync(tempPath);
+        } catch (e) {
+            console.error("❌ Failed to sync Classes to Cloud:", e.message);
+        }
+    }, 5000); // Debounce 5s
+};
+
+// Helper: Load Classes from Cloudinary
+const loadClassesFromCloud = async () => {
+    // Only sync if Cloudinary is configured
+    if (!process.env.CLOUDINARY_CLOUD_NAME) return;
+    
+    try {
+        console.log("☁️ Fetching Classes from Cloudinary...");
+        const url = cloudinary.url(CLOUD_CLASSES_DB_PUBLIC_ID, { resource_type: 'raw' });
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                localClasses = data;
+                console.log(`✅ Loaded ${localClasses.length} classes from Cloud Backup.`);
+            }
+        } else {
+            console.log("⚠️ No Cloud Classes found, using default.");
+        }
+    } catch (e) {
+        console.warn("⚠️ Could not load Cloud Classes:", e.message);
+    }
+};
 
 
 
@@ -275,306 +306,11 @@ const saveAudioMap = (data) => {
 };
 
 // --- 5. API ROUTES ---
+app.use('/api/students', studentRoutes(localStudents, saveDBToCloud));
 
-// UPLOAD STUDENT AUDIO
-app.post('/api/upload-student-audio', uploadMiddleware, (req, res) => {
-    if (req.file) {
-        // Cloudinary/Multer usually puts the URL in 'path' or 'secure_url'
-        let fileUrl = req.file.secure_url || req.file.path; // Try secure_url first (HTTPS), then path
+app.use('/api/lessons', lessonRoutes);
 
-        // Force HTTPS for Cloudinary URLs to prevent Mixed Content errors on Render
-        if (fileUrl && fileUrl.startsWith('http:') && fileUrl.includes('cloudinary.com')) {
-            fileUrl = fileUrl.replace('http:', 'https:');
-        }
-
-        // If we are using local disk storage (fallback), req.file.path is a system path.
-        if (!process.env.CLOUDINARY_CLOUD_NAME) {
-            const filename = req.file.filename;
-            fileUrl = `/uploads/${filename}`;
-        }
-
-        console.log("✅ File uploaded, URL:", fileUrl);
-        res.json({ url: fileUrl });
-    } else {
-        res.status(400).json({ error: 'No audio file uploaded' });
-    }
-});
-
-// GET All Students (Filtered by ClassId)
-app.get('/api/students', async (req, res) => {
-    try {
-        if (mongoose.connection.readyState === 1) {
-            const classId = req.query.classId;
-            let filter = {};
-            if (classId) {
-                if (classId === 'DEFAULT') {
-                    filter = { $or: [{ classId: 'DEFAULT' }, { classId: { $exists: false } }, { classId: null }] };
-                } else {
-                    filter = { classId };
-                }
-            }
-            const students = await Student.find(filter).sort({ lastPractice: -1 });
-            return res.json(students);
-        }
-
-        // Fallback: Return Local Data
-        let filtered = localStudents;
-        const classId = req.query.classId;
-        
-        if (classId) {
-            if (classId === 'DEFAULT') {
-                // Lớp mặc định: Bao gồm học sinh đã gán 'DEFAULT' HOẶC học sinh cũ chưa có classId
-                filtered = localStudents.filter(s => !s.classId || s.classId === 'DEFAULT');
-            } else {
-                // Lớp cụ thể
-                filtered = localStudents.filter(s => s.classId === classId);
-            }
-        }
-        
-        res.json(filtered);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// CREATE / SYNC Student
-app.post('/api/students', async (req, res) => {
-    try {
-        const data = req.body;
-
-        if (mongoose.connection.readyState === 1) {
-            // ... MongoDB Logic (Same as before but specific fields)
-            const updateData = { ...data };
-            delete updateData.id;
-            const student = await Student.findOneAndUpdate(
-                { id: data.id },
-                {
-                    $set: updateData,
-                    $setOnInsert: { lastPractice: new Date() }
-                },
-                { new: true, upsert: true }
-            );
-            return res.json(student);
-        }
-
-        // Fallback: Update Local Data
-        const idx = localStudents.findIndex(s => s.id === data.id);
-        if (idx >= 0) {
-            // Merge updates
-            localStudents[idx] = { ...localStudents[idx], ...data, lastPractice: new Date() };
-        } else {
-            localStudents.push({ ...data, lastPractice: new Date(), history: data.history || [] });
-        }
-
-        saveDBToCloud(); // Trigger Sync
-        res.json(localStudents.find(s => s.id === data.id));
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// UPDATE Progress (After Lesson)
-app.post('/api/students/:id/progress', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { score, speed, week, lessonTitle, audioUrl } = req.body;
-        const weekNum = Number(week) || 0; // Ép kiểu sang số (mặc định 0 nếu lỗi)
-
-        if (mongoose.connection.readyState === 1) {
-            let student = await Student.findOne({ id });
-
-            // FIX: Nếu không tìm thấy học sinh (do DB mới reset), tự tạo mới thay vì báo lỗi
-            if (!student) {
-                console.log(`⚠️ Auto-creating temporary student record for ID: ${id} (MongoDB Mode)`);
-                student = new Student({
-                    id: id,
-                    name: "Học sinh " + id, // Tên tạm
-                    history: []
-                });
-            }
-
-            // Update History for this week
-            const historyIndex = student.history.findIndex(h => h.week === weekNum);
-            if (historyIndex >= 0) {
-                student.history[historyIndex].score = score;
-                student.history[historyIndex].speed = speed;
-                if (audioUrl) student.history[historyIndex].audioUrl = audioUrl;
-            } else {
-                student.history.push({ week: weekNum, score, speed, audioUrl });
-            }
-
-            // Recalc Stats
-            const totalScore = student.history.reduce((acc, h) => acc + h.score, 0);
-            student.averageScore = Math.round(totalScore / student.history.length);
-            student.completedLessons = student.history.length;
-            student.readingSpeed = speed;
-            student.lastPractice = new Date();
-
-            await student.save();
-            return res.json(student);
-        }
-
-        // Fallback: Update Local Data
-        let idx = localStudents.findIndex(s => s.id === id);
-
-        // FIX: Nếu server khởi động lại mất dữ liệu RAM, tự tạo lại học sinh
-        if (idx === -1) {
-            console.log(`⚠️ Auto-creating temporary student record for ID: ${id} (Local Mode)`);
-            localStudents.push({
-                id: id,
-                name: "Học sinh " + id, // Tên tạm
-                classId: 'DEFAULT',
-                completedLessons: 0,
-                averageScore: 0,
-                history: [],
-                lastPractice: new Date()
-            });
-            idx = localStudents.length - 1;
-        }
-
-        const student = localStudents[idx];
-        const historyIndex = student.history.findIndex(h => h.week === weekNum);
-
-        if (historyIndex >= 0) {
-            student.history[historyIndex].score = score;
-            student.history[historyIndex].speed = speed;
-            if (audioUrl) student.history[historyIndex].audioUrl = audioUrl;
-        } else {
-            student.history.push({ week: weekNum, score, speed, audioUrl });
-        }
-
-        const totalScore = student.history.reduce((acc, h) => acc + h.score, 0);
-        student.averageScore = Math.round(totalScore / student.history.length);
-        student.completedLessons = student.history.length;
-        student.readingSpeed = speed;
-        student.lastPractice = new Date();
-
-        localStudents[idx] = student;
-        saveDBToCloud(); // Sync
-        res.json(student);
-
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// DELETE Student
-app.delete('/api/students/:id', async (req, res) => {
-    try {
-        await Student.deleteOne({ id: req.params.id });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- IMPORT STUDENTS FROM EXCEL ---
-const uploadTemp = multer({ dest: 'uploads/temp/' });
-app.post('/api/students/import', uploadTemp.single('file'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
-
-        console.log("📂 Processing Excel file:", req.file.path);
-        const workbook = xlsx.readFile(req.file.path);
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(sheet);
-
-        let count = 0;
-        const classId = req.body.classId || '1A3';
-
-        console.log(`📊 Found ${data.length} rows. Target Class: ${classId}`);
-
-        for (const row of data) {
-            // Flexible column names
-            const name = row['Họ và tên'] || row['Name'] || row['Tên'] || row['Họ tên'] || row['student_name'];
-            if (!name) continue;
-
-            const studentId = `s${Date.now()}${Math.floor(Math.random() * 1000)}`;
-
-            const newStudent = {
-                id: studentId,
-                name: String(name).trim(),
-                classId: classId,
-                completedLessons: 0,
-                averageScore: 0,
-                readingSpeed: 0,
-                history: [],
-                lastPractice: new Date(),
-                badges: []
-            };
-
-
-            if (mongoose.connection.readyState === 1) {
-                await Student.create(newStudent);
-            } else {
-                // Fallback: Add to Local DB
-                localStudents.push(newStudent);
-            }
-            count++;
-        }
-
-        // Sync if in fallback mode
-        if (mongoose.connection.readyState !== 1) {
-            saveDBToCloud();
-        }
-
-        // Cleanup temp file
-        try { fs.unlinkSync(req.file.path); } catch (e) {
-            console.error("Warning: Could not delete temp file", e);
-        }
-
-        console.log(`✅ Imported ${count} students successfully.`);
-        res.json({ success: true, count, message: `Thêm thành công ${count} học sinh!` });
-
-
-    } catch (error) {
-        console.error("❌ Import Failed:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// --- LESSON MANAGEMENT ROUTES ---
-
-// GET All Lessons
-app.get('/api/lessons', async (req, res) => {
-    try {
-        if (mongoose.connection.readyState !== 1) return res.json([]);
-        const lessons = await Lesson.find().sort({ week: 1 });
-        res.json(lessons);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// CREATE / UPDATE Lesson
-app.post('/api/lessons', async (req, res) => {
-    try {
-        const lessonData = req.body;
-        // Upsert based on lesson ID
-        const lesson = await Lesson.findOneAndUpdate(
-            { id: lessonData.id },
-            { $set: lessonData },
-            { new: true, upsert: true }
-        );
-        res.json(lesson);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// DELETE Lesson
-app.delete('/api/lessons/:id', async (req, res) => {
-    try {
-        await Lesson.deleteOne({ id: req.params.id });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+app.use('/api/classes', classRoutes(localClasses, saveClassesToCloud));
 
 // Health Check & Debug Info
 app.get('/api/health', (req, res) => {
@@ -673,9 +409,9 @@ app.get('/api/lessons/:lessonId/custom-audio', async (req, res) => {
 app.get('/api/test-cloudinary', async (req, res) => {
     try {
         if (!process.env.CLOUDINARY_CLOUD_NAME) {
-            return res.status(500).json({
-                status: 'error',
-                message: 'Missing Environment Variables',
+            return res.json({
+                status: 'local_mode',
+                message: 'Cloudinary not configured (Local Mode)',
                 env: {
                     cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
                     api_key: !!process.env.CLOUDINARY_API_KEY,
@@ -702,29 +438,18 @@ app.get('/api/test-cloudinary', async (req, res) => {
 });
 
 
-// --- 5. DATA RECOVERY (Restore DB from Cloudinary Files) ---
-app.post('/api/admin/recover-from-cloud', async (req, res) => {
-    try {
-        if (!process.env.CLOUDINARY_CLOUD_NAME) {
-            return res.status(400).json({ error: 'Cloudinary not configured' });
-        }
-
-        console.log("🔄 STARTING RECOVERY from Cloudinary...");
-
-        // 1. Fetch all files from Cloudinary (Check both 'image' default and 'video' for audio)
+// --- 5. DATA RECOVERY HELPERS ---
+const recoveryService = {
+    /** Fetches all resources from a Cloudinary folder, handling pagination. */
+    async fetchAllCloudinaryResources(prefix) {
         let resources = [];
-        const resourceTypes = ['image', 'video', 'raw']; // Audio often falls under video or raw in Cloudinary
-
+        const resourceTypes = ['video', 'raw', 'image']; // Search in this order
         for (const type of resourceTypes) {
             let nextCursor = null;
             try {
                 do {
                     const result = await cloudinary.api.resources({
-                        resource_type: type,
-                        type: 'upload',
-                        prefix: 'reading-app-audio/', // Folder prefix
-                        max_results: 500,
-                        next_cursor: nextCursor
+                        resource_type: type, type: 'upload', prefix, max_results: 500, next_cursor: nextCursor
                     });
                     resources = [...resources, ...result.resources];
                     nextCursor = result.next_cursor;
@@ -733,130 +458,108 @@ app.post('/api/admin/recover-from-cloud', async (req, res) => {
                 console.warn(`Skipping resource type ${type}:`, e.message);
             }
         }
+        return resources;
+    },
 
-        console.log(`📂 Found ${resources.length} files on Cloudinary.`);
+    /** Parses a resource to find studentId and week. */
+    parseResourceForStudent(resource) {
+        const filename = resource.public_id.split('/').pop();
+        const originalName = resource.original_filename || "";
+        const regex = /student_([a-zA-Z0-9_-]+)_w(\d+)/;
 
-        let restoredCount = 0;
+        let match = filename.match(regex) || (originalName && originalName.match(regex));
+        if (!match) return null;
 
-        // 2. Loop through files and match to students
-        const unmatchedFiles = [];
-        for (const file of resources) {
-            // Source 1: Check Public ID
-            const filename = file.public_id.split('/').pop();
+        return { studentId: match[1], week: parseInt(match[2]) };
+    },
 
-            // Source 2: Check Original Filename (Hidden metadata)
-            const originalName = file.original_filename || "";
-
-            // Try matching in Public ID first, then Original Name
-            let match = filename.match(/student_([a-zA-Z0-9_-]+)_w(\d+)/);
-            if (!match && originalName) {
-                match = originalName.match(/student_([a-zA-Z0-9_-]+)_w(\d+)/);
+    /** Updates or creates a student record with the recovered audio URL. */
+    async updateStudentWithAudio(studentId, week, audioUrl, localStudents) {
+        let wasUpdated = false;
+        if (mongoose.connection.readyState === 1) {
+            let student = await Student.findOne({ id: studentId });
+            if (!student) {
+                const blockedIdsString = process.env.RECOVERY_BLOCKED_IDS || '';
+                if (blockedIdsString.split(',').includes(studentId)) return false;
+                student = new Student({ id: studentId, name: `Học sinh (Khôi phục ${studentId.substr(-4)})`, classId: 'RECOVERED', history: [] });
             }
 
-            if (!match) {
-                // Formatting for debug: "[public_id] / [original]"
-                const debugStr = `${filename}${originalName ? ' (' + originalName + ')' : ''}`;
-                if (unmatchedFiles.length < 5) unmatchedFiles.push(debugStr);
-                continue;
+            const historyIndex = student.history.findIndex(h => h.week === week);
+            if (historyIndex === -1) {
+                student.history.push({ week, score: 0, speed: 0, audioUrl });
+                wasUpdated = true;
+            } else if (!student.history[historyIndex].audioUrl) {
+                student.history[historyIndex].audioUrl = audioUrl;
+                wasUpdated = true;
             }
-
-            const studentId = match[1];
-            const week = parseInt(match[2]);
-
-            if (!studentId || isNaN(week)) continue;
-
-            // ... (Rest of update logic is same)
-            // Construct HTTPS URL
-            const audioUrl = file.secure_url;
-
-            // LOGIC SPLIT: MONGO vs LOCAL
-            if (mongoose.connection.readyState === 1) {
-                // --- MONGO DB MODE ---
-                let student = await Student.findOne({ id: studentId });
-
-                if (!student) {
-                    // BLOCKED IDs (Deleted Students)
-                    const BLOCKED_IDS = ['s1766212172691'];
-                    if (BLOCKED_IDS.includes(studentId)) {
-                        console.log(`🚫 Skipping recovery for banned ID: ${studentId}`);
-                        continue;
-                    }
-
-                    student = new Student({
-                        id: studentId,
-                        name: `Học sinh (Khôi phục ${studentId.substr(-4)})`,
-                        classId: 'RECOVERED',
-                        completedLessons: 0,
-                        averageScore: 0,
-                        history: []
-                    });
-                }
-
-
-                const historyIndex = student.history.findIndex(h => h.week === week);
-                if (historyIndex === -1) {
-                    student.history.push({ week, score: 0, speed: 0, audioUrl });
-                    restoredCount++;
-                } else if (!student.history[historyIndex].audioUrl) {
-                    student.history[historyIndex].audioUrl = audioUrl;
-                    restoredCount++;
-                }
+            if (wasUpdated) {
                 student.completedLessons = student.history.length;
                 await student.save();
-            } else {
-                // --- LOCAL MODE ---
-                let idx = localStudents.findIndex(s => s.id === studentId);
-                if (idx === -1) {
-                    localStudents.push({
-                        id: studentId,
-                        name: `Học sinh (Khôi phục ${studentId.substr(-4)})`,
-                        classId: 'RECOVERED',
-                        completedLessons: 0,
-                        averageScore: 0,
-                        history: [],
-                        lastPractice: new Date()
-                    });
-                    idx = localStudents.length - 1;
-                }
-
-                const student = localStudents[idx];
-                const historyIndex = student.history.findIndex(h => h.week === week);
-
-                if (historyIndex === -1) {
-                    student.history.push({ week, score: 0, speed: 0, audioUrl });
-                    restoredCount++;
-                } else if (!student.history[historyIndex].audioUrl) {
-                    student.history[historyIndex].audioUrl = audioUrl;
-                    restoredCount++;
-                }
+            }
+        } else {
+            // Local mode
+            let idx = localStudents.findIndex(s => s.id === studentId);
+            if (idx === -1) {
+                localStudents.push({ id: studentId, name: `Học sinh (Khôi phục ${studentId.substr(-4)})`, classId: 'RECOVERED', history: [], lastPractice: new Date() });
+                idx = localStudents.length - 1;
+            }
+            const student = localStudents[idx];
+            const historyIndex = student.history.findIndex(h => h.week === week);
+            if (historyIndex === -1) {
+                student.history.push({ week, score: 0, speed: 0, audioUrl });
+                wasUpdated = true;
+            } else if (!student.history[historyIndex].audioUrl) {
+                student.history[historyIndex].audioUrl = audioUrl;
+                wasUpdated = true;
+            }
+            if (wasUpdated) {
                 student.completedLessons = student.history.length;
                 localStudents[idx] = student;
             }
         }
-
-        // 3. Sync if needed
-        if (mongoose.connection.readyState !== 1 && restoredCount > 0) {
-            saveDBToCloud();
-        }
-
-        console.log(`✅ Recovery Complete. Restored/Linked ${restoredCount} items.`);
-
-        let msg = `Tìm thấy ${resources.length} file. Đã khôi phục liên kết cho ${restoredCount} bài đọc.`;
-        if (restoredCount === 0 && unmatchedFiles.length > 0) {
-            msg += ` (Mẫu file lạ: ${unmatchedFiles.join(', ')}...)`;
-        }
-
-        res.json({
-            success: true,
-            totalFiles: resources.length,
-            restoredCount: restoredCount,
-            message: msg
-        });
-
-    } catch (error) {
-        console.error("Recovery Error:", error);
-        res.status(500).json({ error: error.message });
+        return wasUpdated;
     }
+};
+
+app.post('/api/admin/recover-from-cloud', async (req, res) => {
+    if (!process.env.CLOUDINARY_CLOUD_NAME) {
+        return res.status(400).json({ error: 'Cloudinary not configured' });
+    }
+
+    console.log("🔄 STARTING RECOVERY from Cloudinary...");
+    const resources = await recoveryService.fetchAllCloudinaryResources('reading-app-audio/');
+    console.log(`📂 Found ${resources.length} files on Cloudinary.`);
+
+    let restoredCount = 0;
+    const unmatchedFiles = [];
+
+    for (const file of resources) {
+        const match = recoveryService.parseResourceForStudent(file);
+        if (match) {
+            const updated = await recoveryService.updateStudentWithAudio(match.studentId, match.week, file.secure_url, localStudents);
+            if (updated) restoredCount++;
+        } else {
+            const debugStr = `${file.public_id.split('/').pop()}${file.original_filename ? ' (' + file.original_filename + ')' : ''}`;
+            if (unmatchedFiles.length < 5) unmatchedFiles.push(debugStr);
+        }
+    }
+
+    if (mongoose.connection.readyState !== 1 && restoredCount > 0) {
+        saveDBToCloud();
+    }
+
+    console.log(`✅ Recovery Complete. Restored/Linked ${restoredCount} items.`);
+    let msg = `Tìm thấy ${resources.length} file. Đã khôi phục liên kết cho ${restoredCount} bài đọc.`;
+    if (restoredCount === 0 && unmatchedFiles.length > 0) {
+        msg += ` (Mẫu file lạ: ${unmatchedFiles.join(', ')}...)`;
+    }
+
+    res.json({
+        success: true,
+        totalFiles: resources.length,
+        restoredCount: restoredCount,
+        message: msg
+    });
 });
 
 // --- 6. LOST & FOUND (List all Cloudinary files) ---
@@ -879,7 +582,8 @@ app.get('/api/admin/cloudinary-files', async (req, res) => {
             prefix: 'reading-app-audio/',
             max_results: 50,
             next_cursor: nextCursor,
-            order: 'created_at:desc' // Newest first
+            sort_by: 'created_at',
+            direction: 'desc'
         });
 
         res.json({
@@ -906,10 +610,15 @@ if (fs.existsSync(distPath)) {
     console.log("Serving frontend from:", distPath);
     app.use(express.static(distPath));
     // SPA Fallback
-    app.get(/.*/, (req, res) => {
-        if (!req.path.startsWith('/api')) {
-            res.sendFile(path.join(distPath, 'index.html'));
+    app.get(/.*/, (req, res, next) => {
+        // Nếu yêu cầu bắt đầu bằng /api/, hãy để nó đi qua.
+        // Nếu không có route API nào khớp, Express sẽ tự động trả về lỗi 404.
+        if (req.path.startsWith('/api/')) {
+            return next();
         }
+        // Đối với tất cả các yêu cầu GET khác, trả về file index.html chính.
+        // Điều này cho phép React Router ở phía giao diện xử lý URL.
+        res.sendFile(path.join(distPath, 'index.html'));
     });
 } else {
     // Default Home for API-only mode
@@ -921,68 +630,24 @@ if (fs.existsSync(distPath)) {
 
 // WRAP STARTUP IN ASYNC TO WAIT FOR DB/DATA LOAD
 const startServer = async () => {
-    console.log("⏳ Initializing Data Connection...");
-    await connectDB();
+    try {
+        console.log("⏳ Initializing Data Connection...");
+        await connectDB();
 
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 FULL SERVER running on port ${PORT}`);
-        console.log(`👉 Local: http://localhost:${PORT}`);
-    });
-};
-
-startServer();
-            prefix: 'reading-app-audio/',
-            max_results: 50,
-            next_cursor: nextCursor,
-            order: 'created_at:desc' // Newest first
+        const server = app.listen(PORT, '0.0.0.0', () => {
+            console.log(`🚀 FULL SERVER running on port ${PORT}`);
+            console.log(`👉 Local: http://localhost:${PORT}`);
         });
-
-        res.json({
-            files: result.resources.map(f => ({
-                public_id: f.public_id,
-                url: f.secure_url,
-                created_at: f.created_at,
-                format: f.format,
-                size: f.bytes
-            })),
-            next_cursor: result.next_cursor
+        
+        server.on('error', (e) => {
+            console.error("Server Error:", e);
         });
-
-    } catch (error) {
-        console.error("Fetch Files Error:", error);
-        res.status(500).json({ error: error.message });
+    } catch (err) {
+        console.error("Start Server Error:", err);
     }
-});
-
-
-// --- 6. SERVE FRONTEND ---
-const distPath = path.join(__dirname, '../dist');
-if (fs.existsSync(distPath)) {
-    console.log("Serving frontend from:", distPath);
-    app.use(express.static(distPath));
-    // SPA Fallback
-    app.get(/.*/, (req, res) => {
-        if (!req.path.startsWith('/api')) {
-            res.sendFile(path.join(distPath, 'index.html'));
-        }
-    });
-} else {
-    // Default Home for API-only mode
-    app.get('/', (req, res) => {
-        res.send('Server is running (API mode). Frontend not found.');
-    });
-}
-
-
-// WRAP STARTUP IN ASYNC TO WAIT FOR DB/DATA LOAD
-const startServer = async () => {
-    console.log("⏳ Initializing Data Connection...");
-    await connectDB();
-
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 FULL SERVER running on port ${PORT}`);
-        console.log(`👉 Local: http://localhost:${PORT}`);
-    });
 };
 
-startServer();
+startServer().catch(err => console.error("Unhandled Startup Error:", err));
+
+process.on('exit', (code) => console.log(`Process exiting with code: ${code}`));
+process.on('SIGINT', () => { console.log('SIGINT received'); process.exit(); });
