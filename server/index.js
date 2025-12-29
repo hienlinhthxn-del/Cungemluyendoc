@@ -56,35 +56,37 @@ let localStudents = [];
 const DB_FILE = 'reading_app_db.json';
 const CLOUD_DB_PUBLIC_ID = 'reading_app_db_backup.json';
 
-// Helper: Save DB to Cloudinary (Debounced)
-let saveTimeout = null;
-const saveDBToCloud = () => {
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(async () => {
-        // Only sync if Cloudinary is configured
-        if (!process.env.CLOUDINARY_CLOUD_NAME) return;
+// --- Generic Helper to Debounce Cloudinary JSON Uploads ---
+const createDebouncedUploader = (publicId, getDataFn, entityName) => {
+    let timeoutId = null;
+    return () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(async () => {
+            if (!process.env.CLOUDINARY_CLOUD_NAME) return;
 
-        try {
-            console.log("☁️ Syncing Database to Cloudinary...");
-            const jsonString = JSON.stringify(localStudents, null, 2);
-            // We use a data URI or temp file. Multer is for incoming requests, here we use direct upload.
-            // But we can upload raw string as buffer? 
-            // Better: Write to temp file then upload
-            const tempPath = path.join(__dirname, 'temp_db.json');
-            fs.writeFileSync(tempPath, jsonString);
+            try {
+                console.log(`☁️ Syncing ${entityName} to Cloudinary...`);
+                const data = getDataFn();
+                const jsonString = JSON.stringify(data, null, 2);
 
-            await cloudinary.uploader.upload(tempPath, {
-                resource_type: 'raw',
-                public_id: CLOUD_DB_PUBLIC_ID,
-                overwrite: true,
-                invalidate: true
-            });
-            console.log("✅ Database Synced to Cloudinary!");
-            fs.unlinkSync(tempPath);
-        } catch (e) {
-            console.error("❌ Failed to sync DB to Cloud:", e.message);
-        }
-    }, 5000); // Debounce 5s
+                // Use upload_stream to avoid writing a temporary file to disk
+                await new Promise((resolve, reject) => {
+                    const uploadStream = cloudinary.uploader.upload_stream(
+                        { resource_type: 'raw', public_id: publicId, overwrite: true, invalidate: true },
+                        (error, result) => {
+                            if (error) return reject(error);
+                            resolve(result);
+                        }
+                    );
+                    uploadStream.end(jsonString);
+                });
+
+                console.log(`✅ ${entityName} Synced to Cloudinary!`);
+            } catch (e) {
+                console.error(`❌ Failed to sync ${entityName} to Cloud:`, e.message);
+            }
+        }, 5000); // Debounce for 5 seconds
+    };
 };
 
 // Helper: Load DB from Cloudinary
@@ -228,33 +230,9 @@ let localClasses = [
 
 const CLOUD_CLASSES_DB_PUBLIC_ID = 'reading_app_classes_backup.json';
 
-// Helper: Save Classes to Cloudinary (Debounced)
-let saveClassesTimeout = null;
-const saveClassesToCloud = () => {
-    if (saveClassesTimeout) clearTimeout(saveClassesTimeout);
-    saveClassesTimeout = setTimeout(async () => {
-        // Only sync if Cloudinary is configured
-        if (!process.env.CLOUDINARY_CLOUD_NAME) return;
-
-        try {
-            console.log("☁️ Syncing Classes to Cloudinary...");
-            const jsonString = JSON.stringify(localClasses, null, 2);
-            const tempPath = path.join(__dirname, 'temp_classes.json');
-            fs.writeFileSync(tempPath, jsonString);
-
-            await cloudinary.uploader.upload(tempPath, {
-                resource_type: 'raw',
-                public_id: CLOUD_CLASSES_DB_PUBLIC_ID,
-                overwrite: true,
-                invalidate: true
-            });
-            console.log("✅ Classes Synced to Cloudinary!");
-            fs.unlinkSync(tempPath);
-        } catch (e) {
-            console.error("❌ Failed to sync Classes to Cloud:", e.message);
-        }
-    }, 5000); // Debounce 5s
-};
+// Create specific uploader instances using the generic helper
+const saveDBToCloud = createDebouncedUploader(CLOUD_DB_PUBLIC_ID, () => localStudents, 'Student Database');
+const saveClassesToCloud = createDebouncedUploader(CLOUD_CLASSES_DB_PUBLIC_ID, () => localClasses, 'Classes Database');
 
 // Helper: Load Classes from Cloudinary
 const loadClassesFromCloud = async () => {
@@ -656,24 +634,31 @@ app.get('/api/admin/cloudinary-files', async (req, res) => {
 
 // --- 6. SERVE FRONTEND ---
 const distPath = path.join(__dirname, '../dist');
-if (fs.existsSync(distPath)) {
-    console.log("Serving frontend from:", distPath);
+const isProduction = process.env.NODE_ENV === 'production';
+
+// In production, the 'dist' folder is required. If it's missing, fail fast.
+if (isProduction && !fs.existsSync(distPath)) {
+    console.error('❌ FATAL: Frontend build directory "dist" not found.');
+    console.error(`   - Path checked: ${distPath}`);
+    console.error('   - This is a production environment (NODE_ENV=production).');
+    console.error('   - Please ensure your frontend is built (e.g., "npm run build") and the output is in the "dist" folder before starting the server.');
+    console.error('   - The build command should run as part of your deployment process.');
+    process.exit(1); // Exit immediately, causing the deployment to fail.
+}
+
+if (fs.existsSync(distPath)) { // This will be true in production (due to the check above) or if built locally.
+    console.log("✅ Serving frontend from:", distPath);
     app.use(express.static(distPath));
-    // SPA Fallback
-    app.get(/.*/, (req, res, next) => {
-        // Nếu yêu cầu bắt đầu bằng /api/, hãy để nó đi qua.
-        // Nếu không có route API nào khớp, Express sẽ tự động trả về lỗi 404.
-        if (req.path.startsWith('/api/')) {
-            return next();
-        }
-        // Đối với tất cả các yêu cầu GET khác, trả về file index.html chính.
-        // Điều này cho phép React Router ở phía giao diện xử lý URL.
+    // SPA Fallback for all non-API routes, allowing client-side routing to take over.
+    app.get(/^(?!\/api\/).*$/, (req, res) => {
         res.sendFile(path.join(distPath, 'index.html'));
     });
 } else {
-    // Default Home for API-only mode
+    // This block now only runs in non-production environments where 'dist' is not found.
+    console.warn('⚠️ Frontend build directory "dist" not found. Server running in API-only mode.');
+    console.warn('   - This is expected during development if you are using a separate dev server (like Vite).');
     app.get('/', (req, res) => {
-        res.send('Server is running (API mode). Frontend not found.');
+        res.send('Server is running in development (API-only mode). Access the frontend via its dev server (e.g., http://localhost:5173).');
     });
 }
 
