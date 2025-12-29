@@ -727,39 +727,42 @@ export const ReadingPractice: React.FC = () => {
    * This is similar to the teacher's `uploadAndSaveAudio` function.
    * @returns The permanent URL of the uploaded file, or null on failure.
    */
-  const uploadStudentAudio = async (blob: Blob, part: 'phoneme' | 'word' | 'reading', textForUpload: string): Promise<string | null> => {
+  const uploadStudentAudio = async (blob: Blob, part: 'phoneme' | 'word' | 'reading'): Promise<string | null> => {
     if (!lesson?.id) return null;
+    const currentStudentId = localStorage.getItem('current_student_id');
+    if (!currentStudentId) {
+        setNotification({ message: 'Không tìm thấy thông tin học sinh để nộp bài.', type: 'error' });
+        return null;
+    }
 
     const formData = new FormData();
     const ext = supportedMimeType.includes('mp4') ? 'mp4' : 'webm';
-    const currentStudentId = localStorage.getItem('current_student_id');
-    // Tạo một tên file duy nhất để tránh ghi đè trên Cloudinary
-    const fileName = `student_${currentStudentId}_${lesson.id}_${part}_${Date.now()}.${ext}`;
+    const fileName = `submission_${currentStudentId}_w${lesson.week}_${part}.${ext}`;
 
     formData.append('audioFile', blob, fileName);
+    formData.append('studentId', currentStudentId);
     formData.append('lessonId', lesson.id);
-    // Endpoint '/custom-audio' yêu cầu một trường 'text' để làm khóa định danh.
-    // Chuỗi `textForUpload` được nối lại (ví dụ: "a. e. o") có thể quá dài hoặc chứa ký tự không hợp lệ, gây ra lỗi server.
-    // Thay vào đó, chúng ta sẽ sử dụng chính tên file duy nhất đã tạo để làm khóa định danh. Đây là một giải pháp an toàn và đảm bảo hoạt động.
-    formData.append('text', fileName);
+    formData.append('week', String(lesson.week));
+    formData.append('part', part);
 
     try {
-      // Sử dụng chung endpoint với giáo viên, vì nó đã được thiết kế để nhận file audio và text.
-      const response = await fetch(`/api/lessons/${lesson.id}/custom-audio`, {
+      // ĐÂY LÀ ENDPOINT MỚI, ĐÚNG CHO VIỆC NỘP BÀI CỦA HỌC SINH.
+      // Endpoint này cần được tạo ở phía backend để nhận file và lưu vào đúng bản ghi của học sinh.
+      const response = await fetch(`/api/submissions`, {
         method: 'POST',
         body: formData,
       });
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Server trả về lỗi không phải JSON' }));
-        throw new Error(errorData.details || errorData.error || 'Server từ chối yêu cầu tải file.');
+        const errorData = await response.json().catch(() => ({ error: 'Lỗi không xác định từ server.' }));
+        throw new Error(errorData.error || 'Server từ chối yêu cầu nộp bài.');
       }
       const data = await response.json();
-      return data.audioUrl; // Expects { audioUrl: '...' }
+      // Server nên trả về { success: true, audioUrl: '...' }
+      return data.audioUrl;
     } catch (error) {
-      console.error("Student audio upload failed:", error);
+      console.error("Lỗi khi nộp bài của học sinh:", error);
       const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
-      // Update the notification to be more specific
-      setNotification({ message: `Lỗi tải file ghi âm: ${errorMessage}`, type: 'error' });
+      setNotification({ message: `Lỗi nộp bài: ${errorMessage}`, type: 'error' });
       return null;
     }
   };
@@ -771,14 +774,14 @@ export const ReadingPractice: React.FC = () => {
    * NOTE: `URL.createObjectURL` is temporary. For persistent storage, the blob
    * needs to be uploaded to a server, and the returned URL should be saved.
    */
-  const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined, textForUpload: string) => {
+  const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined) => {
     if (!lesson || !audioBlob) return;
 
     const currentStudentId = localStorage.getItem('current_student_id');
     if (!currentStudentId) return;
 
     // Tải file ghi âm lên server để lấy đường dẫn (URL) vĩnh viễn
-    const permanentAudioUrl = await uploadStudentAudio(audioBlob, part, textForUpload);
+    const permanentAudioUrl = await uploadStudentAudio(audioBlob, part);
     if (!permanentAudioUrl) {
       console.error(`Tải file thất bại cho phần: ${part}. Kết quả sẽ được lưu mà không có file ghi âm.`);
       // Thông báo lỗi đã được xử lý bên trong uploadStudentAudio
@@ -873,11 +876,11 @@ export const ReadingPractice: React.FC = () => {
           else if (label.includes('Đoạn')) partKey = 'reading';
 
           if (partKey) {
-            await savePartialStudentResult(partKey, feedback.score, feedback.reading_speed || 0, blobToProcess, partialTargetRef.current.text);
+            await savePartialStudentResult(partKey, feedback.score, feedback.reading_speed || 0, blobToProcess);
           }
         } else if (blobToProcess) {
           // This was a full recording, treat it as "Đoạn Văn"
-          await savePartialStudentResult('reading', feedback.score, feedback.reading_speed || 0, blobToProcess, targetText);
+          await savePartialStudentResult('reading', feedback.score, feedback.reading_speed || 0, blobToProcess);
         }
       }
 
