@@ -12,9 +12,9 @@ import dotenv from 'dotenv'; // Load env vars
 import 'express-async-errors'; // Quan trọng: Phải import trước các route của bạn
 
 // Import modular routes
-import studentRoutes from './routes/studentRoutes.js';
-import lessonRoutes from './routes/lessonRoutes.js';
-import classRoutes from './routes/classRoutes.js';
+import studentRoutes from './studentRoutes.js';
+import lessonRoutes from './lessonRoutes.js';
+import classRoutes from './classRoutes.js';
 
 // --- GLOBAL ERROR HANDLERS ---
 // These should be at the top to catch errors early.
