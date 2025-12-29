@@ -165,6 +165,7 @@ export const TeacherDashboard: React.FC = () => {
       eehartData = weekData.map(s => ({
     name: s.name.split(' ').pop(), // Last name
     score: s.currentScore,
+  }));
 
   // --- Class Management Logic ---
   const handleCreateClass = async () => {
