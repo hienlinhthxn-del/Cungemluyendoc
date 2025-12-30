@@ -130,30 +130,31 @@ export const TeacherDashboard: React.FC = () => {
   useEffect(() => {
     // Load feedback from parents
     const handleDataUpdate = () => {
-      // This function is called on initial load and when 'students_updated' is dispatched.
       const newStudentsFromStorage = getStudents();
-
-      // SAFETY CHECK: Prevent data wipe.
-      // If the new data is empty but the current state has data, it's likely a bad sync.
-      // We log it, show a notification, and restore the previous data to localStorage.
-      if (newStudentsFromStorage.length === 0 && students.length > 0) {
-        console.warn("Sync resulted in 0 students. Restoring previous data to prevent loss.");
-        setNotification({ message: "Lỗi đồng bộ: Dữ liệu trên máy đã được bảo vệ.", type: 'error' });
-        saveStudents(students); // Restore localStorage with the data from the current state.
-        return; // Stop further execution to prevent UI update with empty data.
-      }
-
       const allComms = getCommunications();
       const feedback = allComms.filter(c => c.sender === 'PARENT');
       setParentFeedback(feedback);
-      setStudents(newStudentsFromStorage); // Refresh students data
+
+      // Sử dụng functional update để truy cập state trước đó một cách an toàn
+      // và tránh vòng lặp vô hạn.
+      setStudents(prevStudents => {
+        // SAFETY CHECK: Ngăn chặn việc xóa dữ liệu.
+        if (newStudentsFromStorage.length === 0 && prevStudents.length > 0) {
+          console.warn("Lỗi đồng bộ: Dữ liệu mới rỗng. Khôi phục dữ liệu cũ.");
+          setNotification({ message: "Lỗi đồng bộ: Dữ liệu trên máy đã được bảo vệ.", type: 'error' });
+          saveStudents(prevStudents); // Khôi phục localStorage bằng state cũ.
+          return prevStudents; // Giữ lại state cũ, không cập nhật.
+        }
+        // Nếu dữ liệu mới hợp lệ, cập nhật state.
+        return newStudentsFromStorage;
+      });
     };
 
     handleDataUpdate(); // Initial load
     window.addEventListener('students_updated', handleDataUpdate);
 
     return () => window.removeEventListener('students_updated', handleDataUpdate);
-  }, [classId, students]); // Add `students` to dependency array to get its latest value inside the handler
+  }, [classId]); // Chỉ chạy lại khi classId thay đổi để tránh vòng lặp.
 
   // Add Student Modal State
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
