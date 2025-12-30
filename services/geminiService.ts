@@ -90,10 +90,10 @@ export const evaluateReading = async (
       ];
     }
 
-    // PRIMARY ATTEMPT: Gemini 1.5 Flash (Standard Alias)
+    // PRIMARY ATTEMPT: Gemini 1.5 Flash-8B (Newest, Lightweight, less likely to 404 on beta)
     try {
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash", // Use standard alias with new SDK
+        model: "gemini-1.5-flash-8b",
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: schema as any,
@@ -106,13 +106,14 @@ export const evaluateReading = async (
       return JSON.parse(response.text()) as GeminiFeedbackSchema;
 
     } catch (primaryError: any) {
-      console.warn("Primary Flash Failed, trying Fallback (Pro)...", primaryError);
+      console.warn("Primary Flash-8B Failed, trying Fallback (Standard Flash)...", primaryError);
 
-      // FALLBACK ATTEMPT: Gemini Pro (Standard Alias)
+      // FALLBACK ATTEMPT: Gemini 1.5 Flash (Standard)
       const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-pro",
+        model: "gemini-1.5-flash",
         generationConfig: {
           responseMimeType: "application/json",
+          responseSchema: schema as any,
           temperature: 0.4
         }
       });
@@ -128,7 +129,7 @@ export const evaluateReading = async (
     console.error("Gemini Grading Error (All Models Failed):", error);
     return {
       ...getMockResponse(userSpokenText),
-      teacher_notes: `[CODE_VERSION_3.0] Error: ${error instanceof Error ? error.message : String(error)}. Both Flash and Pro models failed.`,
+      teacher_notes: `[CODE_VERSION_4.0] Error: ${error instanceof Error ? error.message : String(error)}. Both Flash-8B and Standard Flash models failed.`,
       encouraging_comment: "Có lỗi kết nối nên cô chưa chấm chính xác được. (Chế độ giả lập 0 điểm)"
     };
   }
