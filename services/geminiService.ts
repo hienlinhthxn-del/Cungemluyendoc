@@ -95,10 +95,10 @@ export const evaluateReading = async (
       ];
     }
 
-    // PRIMARY ATTEMPT: Gemini 1.5 Flash
+    // PRIMARY ATTEMPT: Gemini 1.5 Flash (Explicit Version)
     try {
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-1.5-flash-001", // Standardize on 001
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: schema as any,
@@ -111,13 +111,14 @@ export const evaluateReading = async (
       return JSON.parse(response.text()) as GeminiFeedbackSchema;
 
     } catch (primaryError: any) {
-      console.warn("Primary Model Failed, trying Fallback (Gemini Pro)...", primaryError);
+      console.warn("Primary Flash-001 Failed, trying Fallback (Pro-001)...", primaryError);
 
-      // FALLBACK ATTEMPT: Gemini Pro (v1.0 - Very Stable)
+      // FALLBACK ATTEMPT: Gemini 1.5 Pro (Explicit Version)
       const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-pro",
+        model: "gemini-1.5-pro-001",
         generationConfig: {
-          responseMimeType: "application/json", // Note: gemini-pro might struggle with JSON mode in old versions but 0.21.0 handles it better
+          responseMimeType: "application/json",
+          responseSchema: schema as any,
           temperature: 0.4
         }
       });
@@ -125,10 +126,7 @@ export const evaluateReading = async (
       const fallbackResult = await fallbackModel.generateContent(promptParts);
       const fallbackResponse = fallbackResult.response;
 
-      // Clean up json if needed (gemini-pro sometimes adds markdown)
-      let cleanText = fallbackResponse.text();
-      cleanText = cleanText.replace(/```json/g, '').replace(/```/g, '').trim();
-
+      const cleanText = fallbackResponse.text().replace(/```json/g, '').replace(/```/g, '').trim();
       return JSON.parse(cleanText) as GeminiFeedbackSchema;
     }
 
@@ -136,7 +134,7 @@ export const evaluateReading = async (
     console.error("Gemini Grading Error (All Models Failed):", error);
     return {
       ...getMockResponse(userSpokenText),
-      teacher_notes: `Error: ${error instanceof Error ? error.message : String(error)}. Both Flash and Pro models failed.`,
+      teacher_notes: `Error: ${error instanceof Error ? error.message : String(error)}. Both Flash-001 and Pro-001 models failed.`,
       encouraging_comment: "Có lỗi kết nối nên cô chưa chấm chính xác được. (Chế độ giả lập 0 điểm)"
     };
   }
