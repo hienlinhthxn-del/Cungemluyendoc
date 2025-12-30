@@ -171,6 +171,13 @@ export const TeacherDashboard: React.FC = () => {
   const [uploadingStudentId, setUploadingStudentId] = useState<string | null>(null);
 
   // Notification State
+  // State để kiểm soát việc render biểu đồ sau khi component đã mount
+  const [isChartMounted, setIsChartMounted] = useState(false);
+  useEffect(() => {
+    setIsChartMounted(true);
+    return () => setIsChartMounted(false);
+  }, []);
+
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -392,60 +399,61 @@ export const TeacherDashboard: React.FC = () => {
   const handleUpdateStudent = useCallback((editForm: EditFormState) => {
     if (!editingStudent) return;
 
-    // 1. Create the new, updated array of students immutably.
-    const updatedStudents = students.map(s => {
-      if (s.id !== editingStudent.id) {
-        return s;
-      }
+    setStudents(prevStudents => { // Sử dụng functional update để tránh vòng lặp
+      // 1. Create the new, updated array of students immutably.
+      const updatedStudents = prevStudents.map(s => { // Sử dụng prevStudents
+        if (s.id !== editingStudent.id) {
+          return s;
+        }
 
-      // Đảm bảo history là một mảng để tránh lỗi khi dữ liệu bị hỏng
-      const studentHistory = Array.isArray(s.history) ? s.history : [];
+        // Đảm bảo history là một mảng trước khi gọi .find() để tránh lỗi
+        const studentHistory = Array.isArray(s.history) ? s.history : [];
 
-      // Cập nhật lịch sử của tuần cụ thể đang được chỉnh sửa
-      const historyExists = studentHistory.some(h => h.week === selectedWeek);
-      const updatedHistory = historyExists
-        ? studentHistory.map(h =>
-          h.week === selectedWeek
-            ? {
-              ...h,
-              score: Number(editForm.score), // Điểm tổng kết
-              speed: editForm.speed,
-              // Cập nhật các điểm thành phần
-              phonemeScore: editForm.phonemeScore,
-              wordScore: editForm.wordScore,
-              readingScore: editForm.readingScore, // Sửa từ sentenceScore nếu có
-              exerciseScore: editForm.exerciseScore,
-            }
-            : h
-        )
-        : [...studentHistory, {
-          week: selectedWeek,
-          score: Number(editForm.score),
-          speed: editForm.speed, // Thêm speed
-          phonemeScore: editForm.phonemeScore,
-          wordScore: editForm.wordScore,
-          readingScore: editForm.readingScore,
-          exerciseScore: editForm.exerciseScore,
-        }];
+        // Cập nhật lịch sử của tuần cụ thể đang được chỉnh sửa
+        const historyExists = studentHistory.some(h => h.week === selectedWeek);
+        const updatedHistory = historyExists
+          ? studentHistory.map(h =>
+            h.week === selectedWeek
+              ? {
+                ...h,
+                score: Number(editForm.score), // Điểm tổng kết
+                speed: editForm.speed,
+                // Cập nhật các điểm thành phần
+                phonemeScore: editForm.phonemeScore,
+                wordScore: editForm.wordScore,
+                readingScore: editForm.readingScore, // Sửa từ sentenceScore nếu có
+                exerciseScore: editForm.exerciseScore,
+              }
+              : h
+          )
+          : [...studentHistory, {
+            week: selectedWeek,
+            score: Number(editForm.score),
+            speed: editForm.speed, // Thêm speed
+            phonemeScore: editForm.phonemeScore,
+            wordScore: editForm.wordScore,
+            readingScore: editForm.readingScore,
+            exerciseScore: editForm.exerciseScore,
+          }];
 
-      // Tính toán lại các chỉ số tổng hợp từ lịch sử đã cập nhật
-      const totalScore = updatedHistory.reduce((acc, h) => acc + (h.score || 0), 0);
-      const newAverageScore = updatedHistory.length > 0 ? Math.round(totalScore / updatedHistory.length) : 0;
+        // Tính toán lại các chỉ số tổng hợp từ lịch sử đã cập nhật
+        const totalScore = updatedHistory.reduce((acc, h) => acc + (h.score || 0), 0);
+        const newAverageScore = updatedHistory.length > 0 ? Math.round(totalScore / updatedHistory.length) : 0;
 
-      return {
-        ...s,
-        name: editForm.name,
-        history: updatedHistory,
-        // Luôn tính toán lại để đảm bảo chính xác
-        completedLessons: updatedHistory.length,
-        averageScore: newAverageScore,
-        readingSpeed: editForm.speed, // Cập nhật tốc độ đọc mới nhất
-      };
+        return {
+          ...s,
+          name: editForm.name,
+          history: updatedHistory,
+          // Luôn tính toán lại để đảm bảo chính xác
+          completedLessons: updatedHistory.length,
+          averageScore: newAverageScore,
+          readingSpeed: editForm.speed, // Cập nhật tốc độ đọc mới nhất
+        };
+      });
+      return updatedStudents; // Trả về state mới
     });
 
     // 2. Update the React state with the new array.
-    setStudents(updatedStudents);
-
     // 3. Save the new array to LocalStorage via the service.
     saveStudents(updatedStudents);
 
@@ -465,7 +473,7 @@ export const TeacherDashboard: React.FC = () => {
     setIsEditModalOpen(false);
     setEditingStudent(null);
     playSuccess();
-  }, [editingStudent, selectedWeek, students]);
+  }, [editingStudent, selectedWeek]); // Xóa `students` khỏi mảng phụ thuộc
 
   // --- AUDIO UPLOAD LOGIC ---
   const handleUploadClick = (studentId: string) => {
@@ -1017,20 +1025,19 @@ export const TeacherDashboard: React.FC = () => {
         {/* Chart */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-bold text-gray-800 mb-6">Biểu đồ điểm số Tuần {selectedWeek}</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  cursor={{ fill: '#EFF6FF' }}
-                />
-                <Bar dataKey="score" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {isChartMounted && ( // Chỉ render biểu đồ khi component đã mount
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} cursor={{ fill: '#EFF6FF' }} />
+                  <Bar dataKey="score" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Alerts & Notes */}
