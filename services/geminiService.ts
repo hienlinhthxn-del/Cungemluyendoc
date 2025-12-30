@@ -57,27 +57,34 @@ export const evaluateReading = async (
     let parts: any[] = [];
 
     if (audioBase64) {
-      // Multimodal prompt with Audio - TUNED FOR VIETNAMESE ACCURACY (STRICT MODE)
+      // Multimodal prompt with Audio - TUNED FOR VIETNAMESE ACCURACY (STRICT MODE V2)
       parts = [
         {
-          text: `Role: Extremely Strict Vietnamese Grade 1 Reading Teacher (Standard Northern Accent / Giọng Miền Bắc).
+          text: `Role: Extremely Strict Vietnamese Grade 1 Reading Teacher (Standard Northern Accent).
           
-          Task: Evaluate the pronunciation of the following student recording against the target text: "${targetText}".
+          Task: Evaluate the student's pronunciation of: "${targetText}".
           
-          Instructions:
-          1. Transcribe EXACTLY what the student said into 'spoken_text'. Capturing every error (e.g., "Hà Lội" instead of "Hà Nội").
-          2. STRICTLY check for Tones (Dấu thanh). Dấu Hỏi vs Dấu Ngã must be perfect.
-          3. STRICTLY check for Initial Consonants (L/N, Tr/Ch, S/X, R/D/Gi). ANY deviation is an error.
-          4. Compare the transcription with the Target Text **Word-by-Word**.
-          5. Grading Criteria:
-             - 100: Absolute perfection, native standard.
-             - 90-99: Very good, maybe 1 very subtle imperfection.
-             - 80-89: Good, but 1 clear error (wrong tone or consonant).
-             - <80: Multiple errors (ngọng, sai dấu).
-             - <50: Wrong text or unintelligible.
-          6. 'mispronounced_words': List ALL words from the TARGET text that were not pronounced perfectly. Matches must be exact.
-          7. 'encouraging_comment': Short, specific encouragement in Vietnamese.
-          8. 'teacher_notes': List the specific errors found (e.g., "Sai từ 'Hà' thành 'Hả'", "Ngọng L/N ở từ 'Lúa'").`
+          CRITICAL INSTRUCTION: You must be UNFORGIVING with errors.
+          
+          1. **ZERO TOLERANCE for Tone Errors**:
+             - Target: "Ngã" -> Student: "Ngả" (Hỏi) => WRONG. mark "Ngã" as mispronounced.
+             - Target: "Lá" -> Student: "La" (No tone) => WRONG.
+          
+          2. **ZERO TOLERANCE for Initial Consonants**:
+             - Target: "Lúa" -> Student: "Núa" => WRONG. mark "Lúa" as mispronounced.
+             - Target: "Trâu" -> Student: "Châu" => WRONG.
+          
+          3. **Transcribe EXACTLY**:
+             - If student says "Nàm", write "Nàm". Do not correct it to "Làm".
+          
+          4. **Output Criteria**:
+             - 'score': 100 (Perfect), 90 (1 minor error), <80 (Any tone/consonant error).
+             - 'mispronounced_words': List EVERY word from the target text that wasn't perfect.
+               - Example: Target "Bé ngủ ngon". Student says "Bé ngủ ngonn". If "ngon" sounds weird, list it.
+               - Example: Target "Con Hổ". Student says "Con Hố". List "Hổ".
+          
+          5. **Feedback**:
+             - Be kind in the 'encouraging_comment' but brutal in the 'mispronounced_words' list.`
         },
         {
           inlineData: {
@@ -94,16 +101,14 @@ export const evaluateReading = async (
           Target Text: "${targetText}"
           Student Input: "${userSpokenText}"
           
-          1. Compare Student Input to Target Text word-for-word.
-          2. Identify any mismatch as a mispronunciation.
-          3. Grade strictness: 10/10.
-          4. Output JSON matching the schema.`
+          Compare word-for-word. Any difference (typo, missing word) is a WRONG word.
+          Output JSON.`
         }
       ];
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-1.5-pro', // UPGRADED TO PRO MODEL FOR BETTER REASONING
       contents: { parts },
       config: {
         responseMimeType: "application/json",
