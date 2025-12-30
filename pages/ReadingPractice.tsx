@@ -1448,11 +1448,36 @@ export const ReadingPractice: React.FC = () => {
                 </div>
               )}
 
+              <div className="mb-6">
+                <h4 className="text-sm font-bold text-gray-500 uppercase mb-2">Chi tiết phát âm:</h4>
+                <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200 text-lg leading-relaxed text-center">
+                  {evaluatedText.split(' ').map((word, index) => {
+                    // Simple normalization for comparison
+                    const cleanWord = word.replace(/[.,!?;:"]/g, '').toLowerCase();
+                    const isMispronounced = result.mispronounced_words.some(w =>
+                      w.replace(/[.,!?;:"]/g, '').toLowerCase() === cleanWord
+                    );
+
+                    return (
+                      <span
+                        key={index}
+                        className={`inline-block mr-1 font-bold px-1 rounded ${isMispronounced
+                            ? 'text-red-500 bg-red-50 decoration-wavy underline decoration-red-300'
+                            : 'text-green-600'
+                          }`}
+                      >
+                        {word}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+
               {result.spoken_text && (
                 <div className="mb-6">
-                  <h4 className="text-sm font-bold text-gray-500 uppercase mb-2">AI đã nghe thấy:</h4>
+                  <h4 className="text-sm font-bold text-gray-400 uppercase mb-2 text-xs">AI nghe được là:</h4>
                   <div className="bg-gray-100 p-3 rounded-lg border border-gray-200">
-                    <p className="text-gray-800 text-sm">{result.spoken_text}</p>
+                    <p className="text-gray-600 text-sm italic">"{result.spoken_text}"</p>
                   </div>
                 </div>
               )}
