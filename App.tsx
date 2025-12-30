@@ -215,6 +215,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         <div className="m-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-md">
           <h2 className="font-bold text-lg mb-2">Đã có lỗi xảy ra</h2>
           <p>{this.props.fallbackMessage}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
+          >
+            Tải lại trang
+          </button>
           {/* Chỉ hiển thị chi tiết lỗi trong môi trường development */}
           {import.meta.env.DEV && this.state.error && (
             <pre className="mt-4 text-xs whitespace-pre-wrap bg-red-50 p-2 rounded">
@@ -237,7 +243,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 const StudentRoutes = () => (
   <>
-    <Route path="/student" element={<StudentDashboard />} />
+    <Route
+      path="/student"
+      element={
+        <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Học sinh. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
+          <StudentDashboard />
+        </ErrorBoundary>
+      }
+    />
     <Route path="/student/practice/:id" element={<ReadingPractice />} />
     <Route path="/student/achievements" element={<AchievementsPage />} />
     <Route path="/leaderboard" element={<LeaderboardPage />} />

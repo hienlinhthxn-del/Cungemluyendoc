@@ -26,6 +26,10 @@ export const TeacherDashboard: React.FC = () => {
   const [newClassName, setNewClassName] = useState('');
   const [newClassTeacher, setNewClassTeacher] = useState('');
 
+  // Loading and Error state
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   // Week Selector State
   // Lesson Data for Weeks
   const [allLessons, setAllLessons] = useState<Lesson[]>(DEFAULT_LESSONS);
@@ -619,6 +623,18 @@ export const TeacherDashboard: React.FC = () => {
       playSuccess();
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <p className="text-gray-500">Đang tải dữ liệu bảng điều khiển...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="p-6 bg-red-50 text-red-600 rounded-lg">{error}</div>;
+  }
 
   return (
     <div className="space-y-8 relative">

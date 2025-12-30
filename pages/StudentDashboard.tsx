@@ -19,12 +19,25 @@ export const StudentDashboard: React.FC = () => {
   const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
 
   // Dynamic Lessons
-  const [allLessons, setAllLessons] = useState<Lesson[]>(DEFAULT_LESSONS);
+  const [allLessons, setAllLessons] = useState<Lesson[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getLessons().then(data => {
-      if (data && data.length > 0) setAllLessons(data);
-    });
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await getLessons();
+        if (data && data.length > 0) setAllLessons(data);
+      } catch (err) {
+        console.error("Lỗi tải bài học:", err);
+        setError("Không thể tải được danh sách bài học. Vui lòng thử lại sau.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   // Student Selection State
@@ -231,6 +244,14 @@ export const StudentDashboard: React.FC = () => {
         )}
       </div>
     );
+  }
+
+  if (isLoading) {
+    return <div className="text-center p-10">Đang tải bài học...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center p-10 text-red-500">{error}</div>;
   }
 
   return (

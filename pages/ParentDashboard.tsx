@@ -13,6 +13,8 @@ export const ParentDashboard: React.FC = () => {
   const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
   const [selectedStudent, setSelectedStudent] = useState<StudentStats | null>(null); // Khởi tạo là null
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const location = useLocation(); // Lấy object location để đọc query params
 
   // Teacher Name State
@@ -41,27 +43,38 @@ export const ParentDashboard: React.FC = () => {
 
   // Effect này sẽ xử lý việc chọn học sinh từ URL hoặc localStorage
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const studentIdFromUrl = params.get('studentId');
-    const allStudents = getStudents(); // Lấy danh sách học sinh mới nhất
+    const loadStudentData = () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const allStudents = getStudents(); // Lấy danh sách học sinh mới nhất
+        setStudents(allStudents);
 
-    let studentToSelect: StudentStats | undefined;
+        const params = new URLSearchParams(location.search);
+        const studentIdFromUrl = params.get('studentId');
+        let studentToSelect: StudentStats | undefined;
 
-    if (studentIdFromUrl) {
-      // Ưu tiên 1: Lấy ID học sinh từ URL
-      studentToSelect = allStudents.find(s => s.id === studentIdFromUrl);
-    } else {
-      // Ưu tiên 2: Lấy ID từ localStorage (hành vi cũ)
-      const savedId = localStorage.getItem('current_student_id');
-      if (savedId) {
-        studentToSelect = allStudents.find(s => s.id === savedId);
+        if (studentIdFromUrl) {
+          // Ưu tiên 1: Lấy ID học sinh từ URL
+          studentToSelect = allStudents.find(s => s.id === studentIdFromUrl);
+        } else {
+          // Ưu tiên 2: Lấy ID từ localStorage (hành vi cũ)
+          const savedId = localStorage.getItem('current_student_id');
+          if (savedId) {
+            studentToSelect = allStudents.find(s => s.id === savedId);
+          }
+        }
+
+        if (studentToSelect) {
+          setSelectedStudent(studentToSelect);
+        }
+      } catch (e) {
+        setError("Không thể tải dữ liệu học sinh.");
       }
+      setIsLoading(false);
     }
-
-    if (studentToSelect) {
-      setSelectedStudent(studentToSelect);
-    }
-  }, [location.search]); // Chạy lại khi URL thay đổi
+    loadStudentData();
+  }, [location.search]); // Chạy lại khi URL hoặc student list thay đổi
 
   // Initial Sync for Parent (Fetch ALL students so search works) - DISABLED to prevent overwriting local data
   useEffect(() => {
@@ -171,6 +184,14 @@ export const ParentDashboard: React.FC = () => {
 
   // Màn hình chọn con (Giả lập đăng nhập phụ huynh)
   if (!selectedStudent) {
+    if (isLoading) {
+      return <div className="text-center p-10">Đang tải danh sách lớp...</div>;
+    }
+
+    if (error) {
+      return <div className="text-center p-10 text-red-500">{error}</div>;
+    }
+
     return (
       <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
         <div className="text-center mb-8">

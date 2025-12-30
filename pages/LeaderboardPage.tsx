@@ -6,13 +6,16 @@ import { playClick } from '../services/audioService';
 
 export const LeaderboardPage: React.FC = () => {
     const [students, setStudents] = useState<StudentStats[]>([]);
+    const [loading, setLoading] = useState(true);
     // Lấy classId từ localStorage của học sinh hoặc giáo viên (tùy ai đang xem)
     const classId = localStorage.getItem('student_class_id') || localStorage.getItem('teacher_class_id') || 'DEFAULT';
 
     useEffect(() => {
         const init = async () => {
+            setLoading(true);
             await syncWithServer(classId);
             setStudents(getStudents());
+            setLoading(false);
         };
         init();
     }, [classId]);
@@ -70,6 +73,14 @@ export const LeaderboardPage: React.FC = () => {
             </div>
         );
     };
+
+    if (loading) {
+        return (
+            <div className="p-8 text-center text-gray-500">
+                Đang tải bảng xếp hạng...
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">

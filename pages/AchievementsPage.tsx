@@ -10,13 +10,24 @@ export const AchievementsPage: React.FC = () => {
 
     // Simulate logged-in student
     const currentStudentId = localStorage.getItem('current_student_id');
-    const currentStudent = getStudents().find(s => s.id === currentStudentId) || MOCK_STUDENTS[0];
+    // Lấy thông tin học sinh một cách an toàn, tránh fallback vào MOCK_STUDENTS
+    const currentStudent = currentStudentId ? getStudents().find(s => s.id === currentStudentId) : null;
 
     useEffect(() => {
         // Trigger animation after component mounts
         const timer = setTimeout(() => setIsLoaded(true), 100);
         return () => clearTimeout(timer);
     }, []);
+
+    // Xử lý trường hợp không tìm thấy học sinh (chưa đăng nhập hoặc ID không hợp lệ)
+    if (!currentStudent) {
+        return (
+            <div className="text-center p-10 bg-yellow-50 rounded-lg">
+                <h2 className="text-xl font-bold text-yellow-800">Không tìm thấy thông tin học sinh!</h2>
+                <p className="text-yellow-700 mt-2">Vui lòng quay lại và chọn tên của mình để xem thành tích.</p>
+            </div>
+        );
+    }
 
     const unlockedAchievements = ACHIEVEMENTS.filter(ach => currentStudent.badges.includes(ach.id));
     const lockedAchievements = ACHIEVEMENTS.filter(ach => !currentStudent.badges.includes(ach.id));

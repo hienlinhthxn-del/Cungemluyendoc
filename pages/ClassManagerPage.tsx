@@ -36,9 +36,15 @@ export const ClassManagerPage: React.FC = () => {
     // Tải danh sách lớp từ localStorage
     const savedClasses = localStorage.getItem('classes');
     if (savedClasses) {
-      // Bỏ qua studentCount cũ nếu có, vì ta sẽ tính lại một cách chính xác
-      const parsedClasses = JSON.parse(savedClasses).map(({id, name}: any) => ({id, name}));
-      setClasses(parsedClasses);
+      try {
+        // Bỏ qua studentCount cũ nếu có, vì ta sẽ tính lại một cách chính xác
+        const parsedClasses = JSON.parse(savedClasses).map(({id, name}: any) => ({id, name}));
+        if (Array.isArray(parsedClasses)) {
+          setClasses(parsedClasses);
+        }
+      } catch (e) {
+        console.error("Lỗi parse JSON từ localStorage cho 'classes':", e);
+      }
     } else {
       // Dữ liệu mẫu nếu chưa có
       setClasses([
