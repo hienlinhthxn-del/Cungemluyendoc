@@ -14,7 +14,9 @@ import { SystemHealthCheck } from '../components/SystemHealthCheck';
 import { getStudents, saveStudents, syncWithServer } from '../services/studentService';
 
 export const TeacherDashboard: React.FC = () => {
-  const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
+  // Khởi tạo state với giá trị rỗng/mặc định để an toàn cho Server-Side Rendering (SSR).
+  // Dữ liệu thật sẽ được tải trong useEffect ở phía client.
+  const [students, setStudents] = useState<StudentStats[]>([]);
   const [selectedStudent, setSelectedStudent] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [savedNotes, setSavedNotes] = useState<{ studentName: string, note: string, date: string }[]>([]);
@@ -47,6 +49,12 @@ export const TeacherDashboard: React.FC = () => {
 
   // Fetch Lessons and Classes on mount
   useEffect(() => {
+    // Tải dữ liệu ban đầu từ localStorage một cách an toàn (chỉ chạy ở client)
+    const savedClassId = localStorage.getItem('teacher_class_id') || 'DEFAULT';
+    setClassId(savedClassId);
+    const initialStudents = getStudents();
+    setStudents(initialStudents);
+
     const fetchData = async () => {
       // 1. Fetch Lessons
       const lessonData = await getLessons();
@@ -87,7 +95,9 @@ export const TeacherDashboard: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Class ID State
-  const [classId, setClassId] = useState(() => localStorage.getItem('teacher_class_id') || 'DEFAULT');
+  // Khởi tạo state với giá trị mặc định, an toàn cho SSR.
+  // Giá trị thật sẽ được đọc từ localStorage trong useEffect.
+  const [classId, setClassId] = useState('DEFAULT');
   const [inputClassId, setInputClassId] = useState(classId);
 
   useEffect(() => {
