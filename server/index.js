@@ -18,15 +18,15 @@ import classRoutes from './classRoutes.js';
 // --- GLOBAL ERROR HANDLERS ---
 // These should be at the top to catch errors early.
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ UNHANDLED REJECTION:', reason);
-  // Crash the process. This is safer than continuing in an unknown state.
-  // It will make Render show the error in the logs instead of hanging.
-  process.exit(1);
+    console.error('❌ UNHANDLED REJECTION:', reason);
+    // Crash the process. This is safer than continuing in an unknown state.
+    // It will make Render show the error in the logs instead of hanging.
+    process.exit(1);
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('❌ UNCAUGHT EXCEPTION:', error);
-  process.exit(1); // Mandatory exit
+    console.error('❌ UNCAUGHT EXCEPTION:', error);
+    process.exit(1); // Mandatory exit
 });
 
 // Import Models
@@ -197,9 +197,9 @@ if (cloudName && apiKey && apiSecret) {
                 return file.originalname.split('.').pop() || 'webm';
             },
             public_id: (req, file) => {
-                // Use original filename (without extension) to make it recoverable
-                // Cloudinary will add suffix if not unique, but base name is preserved
-                return file.originalname.split('.')[0];
+                // Use original filename (without extension) + timestamp to ensure uniqueness
+                const name = file.originalname.split('.')[0];
+                return `${name}_${Date.now()}`;
             }
         },
     });
@@ -278,7 +278,7 @@ const saveClassesToCloud = createDebouncedUploader(CLOUD_CLASSES_DB_PUBLIC_ID, (
 const loadClassesFromCloud = async () => {
     // Only sync if Cloudinary is configured
     if (!process.env.CLOUDINARY_CLOUD_NAME) return;
-    
+
     try {
         console.log("☁️ Fetching Classes from Cloudinary...");
         const url = cloudinary.url(CLOUD_CLASSES_DB_PUBLIC_ID, { resource_type: 'raw' });
@@ -362,9 +362,30 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
             let historyRecord = student.history.find(h => h.week === Number(week));
             if (historyRecord) {
                 historyRecord[audioUrlKey] = audioUrl; // Cập nhật audio
-                if (score !== undefined) historyRecord[scoreKey] = Number(score); // Cập nhật điểm
+                if (score !== undefined) {
+                    historyRecord[scoreKey] = Number(score); // Cập nhật điểm thành phần
+
+                    // --- TÍNH LẠI ĐIỂM TRUNG BÌNH (Server Calculation) ---
+                    // Lấy các điểm thành phần hiện tại (hoặc vừa được cập nhật)
+                    const pScore = scoreKey === 'phonemeScore' ? Number(score) : historyRecord.phonemeScore;
+                    const wScore = scoreKey === 'wordScore' ? Number(score) : historyRecord.wordScore;
+                    const rScore = scoreKey === 'readingScore' ? Number(score) : historyRecord.readingScore;
+
+                    // Chỉ tính trung bình trên các phần ĐÃ CÓ ĐIỂM
+                    const availableScores = [pScore, wScore, rScore].filter(s => s !== undefined && s !== null);
+                    if (availableScores.length > 0) {
+                        const newTotal = Math.round(availableScores.reduce((a, b) => a + b, 0) / availableScores.length);
+                        historyRecord.score = newTotal;
+                    }
+                }
             } else {
-                student.history.push({ week: Number(week), score: 0, speed: 0, [audioUrlKey]: audioUrl, [scoreKey]: Number(score) });
+                student.history.push({
+                    week: Number(week),
+                    score: Number(score) || 0, // Điểm ban đầu
+                    speed: 0,
+                    [audioUrlKey]: audioUrl,
+                    [scoreKey]: Number(score)
+                });
             }
             await student.save();
         } else {
@@ -439,13 +460,14 @@ app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, re
                 { audioUrl },
                 { upsert: true, new: true }
             );
-            console.log("✅ Saved to MongoDB");
+            console.log(`✅ Saved to MongoDB: [${text}] -> ${audioUrl}`);
         } else {
-            console.warn("⚠️ MongoDB not connected, skipping DB save. Saving to audio-map.json");
+            console.warn("⚠️ MongoDB not connected. Saving to audio-map.json");
             const map = loadAudioMap();
             if (!map[lessonId]) map[lessonId] = {};
             map[lessonId][text] = audioUrl;
             saveAudioMap(map);
+            console.log(`✅ Saved to JSON Map: [${text}] -> ${audioUrl}`);
         }
 
         res.json({ audioUrl, text });

@@ -56,15 +56,24 @@ export const syncWithServer = async (classId?: string) => {
 
         const serverData: StudentStats[] = await response.json();
 
-        if (Array.isArray(serverData)) {
-            // CHIẾN LƯỢC MỚI: Coi máy chủ là nguồn dữ liệu duy nhất và đáng tin cậy nhất (Single Source of Truth).
-            // Logic cũ cố gắng hợp nhất dữ liệu máy chủ và local, nhưng gây ra lỗi khi xóa:
-            // học sinh đã xóa ở server bị coi là "chỉ có ở local" và được thêm lại.
-            // Logic mới sẽ ghi đè hoàn toàn dữ liệu local bằng dữ liệu từ server, đảm bảo tính nhất quán.
-            console.log(`Syncing: Server is truth. Overwriting local cache with ${serverData.length} students.`);
-            
-            // Hàm saveStudents sẽ lưu vào localStorage và thông báo cho các component khác cập nhật.
+        // --- LỚP BẢO VỆ DỮ LIỆU ---
+        // Chỉ ghi đè dữ liệu local khi server trả về một danh sách HỢP LỆ và CÓ DỮ LIỆU.
+        // Điều này ngăn chặn việc server trả về `[]` và xóa sạch dữ liệu của người dùng.
+        if (Array.isArray(serverData) && serverData.length > 0) {
+            console.log(`Đồng bộ thành công: Tải về ${serverData.length} học sinh cho lớp ${classId || 'ALL'}.`);
             saveStudents(serverData);
+        } else if (Array.isArray(serverData) && serverData.length === 0) {
+            // Nếu server trả về mảng rỗng, đây là một tình huống nguy hiểm.
+            // Chúng ta KHÔNG ghi đè dữ liệu local.
+            const localStudents = getStudents();
+            if (localStudents.length > 0) {
+                console.warn(`Đồng bộ cảnh báo: Server trả về 0 học sinh cho lớp ${classId}. Giữ lại ${localStudents.length} học sinh trên máy.`);
+            } else {
+                // Nếu cả local cũng rỗng thì không có gì để mất, cứ lưu.
+                saveStudents(serverData);
+            }
+        } else {
+            console.error("Đồng bộ thất bại: Dữ liệu từ server không phải là một mảng hợp lệ.");
         }
     } catch (error) {
         console.error("Sync failed:", error);

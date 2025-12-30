@@ -43,6 +43,7 @@ export interface WeeklyStats {
   wordScore?: number;
   sentenceScore?: number;
   exerciseScore?: number;
+  phonemeScore?: number;
 }
 
 export interface StudentStats {

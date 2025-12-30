@@ -450,25 +450,21 @@ export const TeacherDashboard: React.FC = () => {
           readingSpeed: editForm.speed, // Cập nhật tốc độ đọc mới nhất
         };
       });
+
+      // Perform side effects here with the correct, new data
+      saveStudents(updatedStudents);
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      const updatedStudentForServer = updatedStudents.find(s => s.id === editingStudent.id);
+      if (updatedStudentForServer) {
+        fetch('/api/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedStudentForServer)
+        }).catch(console.error);
+      }
+      
       return updatedStudents; // Trả về state mới
     });
-
-    // 2. Update the React state with the new array.
-    // 3. Save the new array to LocalStorage via the service.
-    saveStudents(updatedStudents);
-
-    // 3.1. Dispatch an event so other open tabs/components can update.
-    window.dispatchEvent(new CustomEvent('students_updated'));
-
-    // 4. Sync the specific updated student to the server.
-    const updatedStudent = updatedStudents.find(s => s.id === editingStudent.id);
-    if (updatedStudent) {
-      fetch('/api/students', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedStudent)
-      }).catch(console.error);
-    }
 
     setIsEditModalOpen(false);
     setEditingStudent(null);
