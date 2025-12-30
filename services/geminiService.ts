@@ -97,7 +97,7 @@ export const evaluateReading = async (
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-pro', // SWITCH TO GEMINI PRO (V1.0) -> MOST STABLE MODEL
+      model: 'gemini-1.5-flash-001', // Explicit version for reliability
       contents: { parts },
       config: {
         responseMimeType: "application/json",
