@@ -21,11 +21,11 @@ export const evaluateReading = async (
 
   // Helper for mock response
   const getMockResponse = (spoken: string): GeminiFeedbackSchema => ({
-    score: Math.floor(Math.random() * 20) + 80, // Random score 80-100
-    mispronounced_words: [],
-    encouraging_comment: "Giả lập: Con đọc rất tốt! (Vui lòng kiểm tra lại API Key hoặc kết nối mạng)",
-    teacher_notes: "Used Mock/Fallback due to missing API Key or Connection Error.",
-    spoken_text: spoken || "Nội dung giả lập...",
+    score: 0, // Set to 0 to indicate FAILURE/MOCK mode clearly
+    mispronounced_words: ["Lỗi", "Kết", "Nối", "API"],
+    encouraging_comment: "Hệ thống chưa kết nối được với AI chấm điểm. Vui lòng kiểm tra API Key hoặc mạng.",
+    teacher_notes: "DEBUG INFO: Using Mock/Fallback. Logic AI chưa chạy. Nguyên nhân: Không tìm thấy API Key hoặc Lỗi kết nối.",
+    spoken_text: spoken || "Không nghe thấy gì...",
   });
 
   // Fallback for demo if no API key
@@ -108,7 +108,7 @@ export const evaluateReading = async (
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-pro', // UPGRADED TO PRO MODEL FOR BETTER REASONING
+      model: 'gemini-1.5-flash', // Revert to Flash for stability
       contents: { parts },
       config: {
         responseMimeType: "application/json",
@@ -129,7 +129,7 @@ export const evaluateReading = async (
     return {
       ...getMockResponse(userSpokenText),
       teacher_notes: `Error: ${error instanceof Error ? error.message : String(error)}. Switched to Mock mode.`,
-      encouraging_comment: "Có lỗi kết nối nên cô chưa chấm chính xác được. Nhưng con đọc tốt lắm! (Chế độ giả lập)"
+      encouraging_comment: "Có lỗi kết nối nên cô chưa chấm chính xác được. (Chế độ giả lập 0 điểm)"
     };
   }
 };

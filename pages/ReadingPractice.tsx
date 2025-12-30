@@ -1440,6 +1440,13 @@ export const ReadingPractice: React.FC = () => {
                 <p className="text-gray-700 italic">"{result.encouraging_comment}"</p>
               </div>
 
+              {/* DEBUG INFO: Helps user understand why grading is good/bad or if it failed */}
+              {result.teacher_notes && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-600 font-mono">
+                  <strong>Debug/Teacher Notes:</strong> {result.teacher_notes}
+                </div>
+              )}
+
               {/* Enhanced Visual Feedback of Text */}
               {evaluatedText && (
                 <div className="mb-6">
@@ -1462,8 +1469,8 @@ export const ReadingPractice: React.FC = () => {
                       <span
                         key={index}
                         className={`inline-block mr-1 font-bold px-1 rounded ${isMispronounced
-                            ? 'text-red-500 bg-red-50 decoration-wavy underline decoration-red-300'
-                            : 'text-green-600'
+                          ? 'text-red-500 bg-red-50 decoration-wavy underline decoration-red-300'
+                          : 'text-green-600'
                           }`}
                       >
                         {word}
