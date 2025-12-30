@@ -364,10 +364,13 @@ export const TeacherDashboard: React.FC = () => {
         return s;
       }
 
+      // Đảm bảo history là một mảng để tránh lỗi khi dữ liệu bị hỏng
+      const studentHistory = Array.isArray(s.history) ? s.history : [];
+
       // Cập nhật lịch sử của tuần cụ thể đang được chỉnh sửa
-      const historyExists = s.history.some(h => h.week === selectedWeek);
+      const historyExists = studentHistory.some(h => h.week === selectedWeek);
       const updatedHistory = historyExists
-        ? s.history.map(h =>
+        ? studentHistory.map(h =>
           h.week === selectedWeek
             ? {
               ...h,
@@ -381,7 +384,7 @@ export const TeacherDashboard: React.FC = () => {
             }
             : h
         )
-        : [...s.history, {
+        : [...studentHistory, {
           week: selectedWeek,
           score: Number(editForm.score),
           speed: editForm.speed, // Thêm speed
