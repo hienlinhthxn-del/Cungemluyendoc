@@ -9,9 +9,51 @@ const getMockResponse = (spoken: string, errorMsg: string): GeminiFeedbackSchema
   score: 0,
   mispronounced_words: ["Lỗi", "Kết", "Nối", "API"],
   encouraging_comment: "Hệ thống chưa kết nối được với AI chấm điểm. Vui lòng kiểm tra API Key.",
-  teacher_notes: `[CODE_VERSION_5.0_REST] Error: ${errorMsg}. Switched to Mock mode.`,
+  teacher_notes: `[CODE_VERSION_6.0_AUTO] Error: ${errorMsg}. Switched to Mock mode.`,
   spoken_text: spoken || "Không nghe thấy gì...",
 });
+
+// 1. DYNAMIC DISCOVERY: Ask Google what models are allowed
+const fetchAvailableModels = async (apiKey: string): Promise<string[]> => {
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    if (!data.models) return [];
+
+    return data.models.map((m: any) => m.name.replace('models/', ''));
+  } catch (e) {
+    console.warn("ListModels failed", e);
+    return [];
+  }
+};
+
+// 2. SELECT BEST MODEL
+const selectBestModel = (availableModels: string[]): string => {
+  // Priority list
+  const priorities = [
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-002',
+    'gemini-1.5-flash-001',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
+    'gemini-pro',
+    'gemini-1.0-pro'
+  ];
+
+  // Logic: Find the first priority that exists in availableModels
+  for (const preferred of priorities) {
+    if (availableModels.some(m => m === preferred || m.includes(preferred))) {
+      // Return the EXACT string from the API list if possible, or the preferred match
+      const exactMatch = availableModels.find(m => m === preferred);
+      return exactMatch || preferred;
+    }
+  }
+
+  // Fallback if list is empty or matches nothing (Blind Guess)
+  return 'gemini-1.5-flash';
+};
 
 // Raw REST API Call Function
 const callGeminiRaw = async (model: string, payload: any, apiKey: string) => {
@@ -19,15 +61,13 @@ const callGeminiRaw = async (model: string, payload: any, apiKey: string) => {
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`API Error ${response.status}: ${errorBody}`);
+    throw new Error(`API Error ${response.status} on model ${model}: ${errorBody}`);
   }
 
   return response.json();
@@ -42,19 +82,29 @@ export const evaluateReading = async (
   const apiKey = getApiKey();
 
   if (!apiKey) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(getMockResponse(userSpokenText, "Missing API Key"));
-      }, 1500);
-    });
+    return new Promise((resolve) => setTimeout(() => resolve(getMockResponse(userSpokenText, "Missing API Key")), 1500));
   }
 
-  // Construct Prompt Parts
-  let parts: any[] = [];
+  // STEP 1: Discover Models
+  let selectedModel = 'gemini-1.5-flash'; // Default guess
+  let discoveryNote = "Skipped/Failed";
 
+  try {
+    const available = await fetchAvailableModels(apiKey);
+    if (available.length > 0) {
+      selectedModel = selectBestModel(available);
+      discoveryNote = `Auto-Selected: ${selectedModel} from [${available.length} available]`;
+    } else {
+      discoveryNote = "ListModels empty/failed -> Using Fallback Guess";
+    }
+  } catch (e) {
+    console.warn("Discovery error", e);
+  }
+
+  // STEP 2: Construct Payload
+  let parts: any[] = [];
   const systemPrompt = `Role: Extremely Strict Vietnamese Grade 1 Reading Teacher (Standard Northern Accent).
     Task: Evaluate the student's pronunciation of: "${targetText}".
-    
     Instructions:
     1. Listen/Read input and compare with target text.
     2. Transcribe EXACTLY what you hear into 'spoken_text'.
@@ -68,12 +118,7 @@ export const evaluateReading = async (
   if (audioBase64) {
     parts = [
       { text: systemPrompt },
-      {
-        inlineData: {
-          mimeType: mimeType,
-          data: audioBase64
-        }
-      }
+      { inlineData: { mimeType: mimeType, data: audioBase64 } }
     ];
   } else {
     parts = [
@@ -81,47 +126,42 @@ export const evaluateReading = async (
     ];
   }
 
-  // Generation Config (JSON Enforced)
-  const generationConfig = {
-    temperature: 0.4,
-    responseMimeType: "application/json",
-    responseSchema: {
-      type: "OBJECT",
-      properties: {
-        score: { type: "INTEGER" },
-        mispronounced_words: { type: "ARRAY", items: { type: "STRING" } },
-        encouraging_comment: { type: "STRING" },
-        teacher_notes: { type: "STRING" },
-        spoken_text: { type: "STRING" }
-      },
-      required: ["score", "mispronounced_words", "encouraging_comment", "teacher_notes", "spoken_text"]
-    }
-  };
-
   const payload = {
     contents: [{ parts }],
-    generationConfig
+    generationConfig: {
+      temperature: 0.4,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          score: { type: "INTEGER" },
+          mispronounced_words: { type: "ARRAY", items: { type: "STRING" } },
+          encouraging_comment: { type: "STRING" },
+          teacher_notes: { type: "STRING" },
+          spoken_text: { type: "STRING" }
+        },
+        required: ["score", "mispronounced_words", "encouraging_comment", "teacher_notes", "spoken_text"]
+      }
+    }
   };
 
   try {
-    // ATTEMPT 1: Gemini 1.5 Flash
-    try {
-      const data = await callGeminiRaw('gemini-1.5-flash', payload, apiKey);
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error("Empty response from Flash");
-      return JSON.parse(text) as GeminiFeedbackSchema;
-    } catch (flashError: any) {
-      console.warn("REST Flash failed, trying Pro...", flashError);
+    // ATTEMPT EXECUTION
+    const data = await callGeminiRaw(selectedModel, payload, apiKey);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-      // ATTEMPT 2: Gemini 1.5 Pro
-      const data = await callGeminiRaw('gemini-1.5-pro', payload, apiKey);
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error("Empty response from Pro");
-      return JSON.parse(text) as GeminiFeedbackSchema;
-    }
+    if (!text) throw new Error(`Empty response from ${selectedModel}`);
+
+    const result = JSON.parse(text) as GeminiFeedbackSchema;
+
+    // Append debug info
+    return {
+      ...result,
+      teacher_notes: `${result.teacher_notes} | [DEBUG: ${discoveryNote}]`
+    };
 
   } catch (error) {
     console.error("REST Grading Error:", error);
-    return getMockResponse(userSpokenText, error instanceof Error ? error.message : String(error));
+    return getMockResponse(userSpokenText, `${error instanceof Error ? error.message : String(error)} | Discovery: ${discoveryNote}`);
   }
 };
