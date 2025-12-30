@@ -160,7 +160,8 @@ export const TeacherDashboard: React.FC = () => {
     });
     
     return classStudents.map(s => {
-      const weekRecord = s.history.find(h => h.week === selectedWeek);
+      // Đảm bảo s.history là một mảng trước khi gọi .find() để tránh lỗi
+      const weekRecord = Array.isArray(s.history) ? s.history.find(h => h.week === selectedWeek) : null;
 
       // Điểm tổng kết (currentScore) được lấy trực tiếp từ bản ghi của tuần đó.
       // Điểm này đã được tính toán và lưu lại khi học sinh nộp bài.

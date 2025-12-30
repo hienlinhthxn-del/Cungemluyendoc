@@ -22,6 +22,11 @@ export default (localStudents, saveDBToCloud) => {
      * @returns The updated student object.
      */
     const updateStudentProgress = (student, { score, speed, weekNum, phonemeScore, wordScore, readingScore, exerciseScore }) => {
+        // Đảm bảo 'history' luôn là một mảng để tránh lỗi.
+        if (!Array.isArray(student.history)) {
+            student.history = [];
+        }
+
         const historyIndex = student.history.findIndex(h => h.week === weekNum);
 
         const progressUpdate = {
@@ -40,7 +45,8 @@ export default (localStudents, saveDBToCloud) => {
             student.history.push({ week: weekNum, ...progressUpdate });
         }
 
-        const totalScore = student.history.reduce((acc, h) => acc + h.score, 0);
+        // Đảm bảo h.score là một số khi tính tổng để tránh kết quả NaN.
+        const totalScore = student.history.reduce((acc, h) => acc + (h.score || 0), 0);
         student.averageScore = student.history.length > 0 ? Math.round(totalScore / student.history.length) : 0;
         student.completedLessons = student.history.length;
         student.readingSpeed = speed;

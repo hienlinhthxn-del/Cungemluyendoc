@@ -3,11 +3,18 @@ import { MOCK_STUDENTS } from '../constants';
 
 const STUDENTS_STORAGE_KEY = 'app_students_data';
 
-// Helper to dedupe students by ID
-const dedupeStudents = (list: StudentStats[]): StudentStats[] => {
+// Helper để dọn dẹp và loại bỏ các bản ghi học sinh trùng lặp hoặc không hợp lệ
+const cleanupAndDedupe = (list: any[]): StudentStats[] => {
+    if (!Array.isArray(list)) return [];
     const seen = new Set();
-    return list.filter(s => {
-        if (seen.has(s.id)) return false;
+    return list.filter((s): s is StudentStats => {
+        // Lọc bỏ các mục không hợp lệ (null, undefined, hoặc không có id)
+        // Một bản ghi học sinh hợp lệ PHẢI có id và tên.
+        if (!s || typeof s.id !== 'string' || typeof s.name !== 'string') {
+            console.warn("Loại bỏ bản ghi học sinh không hợp lệ:", s);
+            return false;
+        }
+        if (seen.has(s.id)) return false; // Lọc bỏ các bản ghi trùng lặp
         seen.add(s.id);
         return true;
     });
@@ -22,7 +29,7 @@ export const getStudents = (): StudentStats[] => {
             if (key === 'lastPractice') return new Date(value);
             return value;
         });
-        return dedupeStudents(parsed);
+        return cleanupAndDedupe(parsed);
     } catch (e) {
         console.error("Failed to load students", e);
         return [];
