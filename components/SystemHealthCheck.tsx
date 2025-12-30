@@ -6,16 +6,19 @@ export const SystemHealthCheck = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Lấy địa chỉ API từ biến môi trường, nếu không có thì dùng đường dẫn tương đối (cho local)
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
     const checkSystems = async () => {
       try {
         // 1. Check Basic Health (Mongo)
-        const healthRes = await fetch('/api/health');
+        const healthRes = await fetch(`${API_BASE_URL}/api/health`);
         const healthData = await healthRes.json().catch(() => 
           ({ mongo_status: 'error', storage_mode: 'unknown', error: 'Server không trả về JSON hợp lệ' })
         );
 
         // 2. Check Cloudinary Connection (Real Ping)
-        const cloudRes = await fetch('/api/test-cloudinary');
+        const cloudRes = await fetch(`${API_BASE_URL}/api/test-cloudinary`);
         const cloudData = await cloudRes.json().catch(() => 
           ({ status: 'error', message: 'Server không trả về JSON hợp lệ' })
         );

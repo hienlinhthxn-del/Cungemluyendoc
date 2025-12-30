@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { ReadingPractice } from './pages/ReadingPractice';
@@ -15,6 +15,10 @@ import { UserRole } from './types';
 import { Users, GraduationCap, Baby, Lock, X, KeyRound, ChevronRight } from 'lucide-react';
 import { playClick, playError, playSuccess } from './services/audioService';
 import { initializeStudentsIfEmpty } from './services/studentService';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { StudentRoutes } from './components/StudentRoutes';
+import { TeacherRoutes } from './components/TeacherRoutes';
+import { ParentRoutes } from './components/ParentRoutes';
 
 // Đề xuất: Sử dụng hằng số để tránh "magic strings" và lỗi gõ sai
 const LOCAL_STORAGE_KEYS = {
@@ -183,113 +187,6 @@ const RoleSelector: React.FC<{ onSelect: (role: UserRole) => void }> = ({ onSele
     </div>
   );
 };
-
-type ErrorBoundaryProps = {
-  children: React.ReactNode;
-  fallbackMessage: string;
-};
-
-type ErrorBoundaryState = {
-  hasError: boolean;
-  error: Error | null;
-};
-
-// Lớp bảo vệ để bắt lỗi render trong các component con
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false, error: null };
-
-  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
-    // Cập nhật state để lần render tiếp theo sẽ hiển thị UI dự phòng.
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Bạn cũng có thể log lỗi này tới một dịch vụ báo cáo lỗi
-    console.error("Lỗi không bắt được trong component:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      // Giao diện dự phòng khi có lỗi
-      return (
-        <div className="m-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg shadow-md">
-          <h2 className="font-bold text-lg mb-2">Đã có lỗi xảy ra</h2>
-          <p>{this.props.fallbackMessage}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
-          >
-            Tải lại trang
-          </button>
-          {/* Chỉ hiển thị chi tiết lỗi trong môi trường development */}
-          {import.meta.env.DEV && this.state.error && (
-            <pre className="mt-4 text-xs whitespace-pre-wrap bg-red-50 p-2 rounded">
-              <code>
-                {this.state.error.toString()}
-                <br />
-                {this.state.error.stack}
-              </code>
-            </pre>
-          )}
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-// Đề xuất: Tách các nhóm route ra thành các component riêng để dễ quản lý.
-// Lý tưởng nhất, mỗi component này nên nằm trong file riêng, ví dụ: `routes/StudentRoutes.tsx`.
-
-const StudentRoutes = () => (
-  <>
-    <Route
-      path="/student"
-      element={
-        <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Học sinh. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
-          <StudentDashboard />
-        </ErrorBoundary>
-      }
-    />
-    <Route path="/student/practice/:id" element={<ReadingPractice />} />
-    <Route path="/student/achievements" element={<AchievementsPage />} />
-    <Route path="/leaderboard" element={<LeaderboardPage />} />
-  </>
-);
-
-const TeacherRoutes = () => (
-  <>
-    <Route
-      path="/teacher"
-      element={
-        <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Giáo viên. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
-          <TeacherDashboard />
-        </ErrorBoundary>
-      }
-    />
-    <Route path="/teacher/reports" element={<ReportsPage />} />
-    <Route path="/teacher/lessons" element={<LessonManager />} />
-    <Route path="/teacher/classes" element={<ClassManagerPage />} />
-    <Route path="/teacher/lost-and-found" element={<LostAndFoundPage onBack={() => window.history.back()} />} />
-    <Route path="/leaderboard" element={<LeaderboardPage />} />
-    {/* Cho phép giáo viên truy cập trang luyện đọc để sửa giọng đọc mẫu */}
-    <Route path="/student/practice/:id" element={<ReadingPractice />} />
-  </>
-);
-
-const ParentRoutes = () => (
-  <>
-    <Route
-      path="/parent"
-      element={
-        <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Phụ huynh. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
-          <ParentDashboard />
-        </ErrorBoundary>
-      }
-    />
-    <Route path="/parent/contact" element={<div className="text-center p-10 text-gray-500">Trang liên hệ đang cập nhật...</div>} />
-  </>
-);
 
 const App: React.FC = () => {
   // Khởi tạo state từ localStorage để ghi nhớ vai trò người dùng

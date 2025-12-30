@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { MOCK_STUDENTS } from '../constants';
 import { ACHIEVEMENTS } from './achievements';
 import { Lock, Share2 } from 'lucide-react';
 import { playClick } from '../services/audioService';
@@ -7,23 +6,36 @@ import { getStudents } from '../services/studentService';
 
 export const AchievementsPage: React.FC = () => {
     const [isLoaded, setIsLoaded] = useState(false);
+    // Sử dụng state để lưu thông tin học sinh. `undefined` là trạng thái ban đầu (đang tải).
+    const [currentStudent, setCurrentStudent] = useState<ReturnType<typeof getStudents>[0] | null | undefined>(undefined);
 
-    // Simulate logged-in student
-    const currentStudentId = localStorage.getItem('current_student_id');
-    // Lấy thông tin học sinh một cách an toàn, tránh fallback vào MOCK_STUDENTS
-    const currentStudent = currentStudentId ? getStudents().find(s => s.id === currentStudentId) : null;
 
     useEffect(() => {
+        // Truy cập localStorage chỉ ở phía client (sau khi component đã mount)
+        // để tránh lỗi "localStorage is not defined" khi render ở server.
+        const studentId = localStorage.getItem('current_student_id');
+        const studentData = studentId ? getStudents().find(s => s.id === studentId) : null;
+        setCurrentStudent(studentData || null);
+
         // Trigger animation after component mounts
         const timer = setTimeout(() => setIsLoaded(true), 100);
         return () => clearTimeout(timer);
     }, []);
 
+    // Trạng thái đang tải, chờ useEffect chạy lần đầu
+    if (currentStudent === undefined) {
+        return (
+            <div className="text-center p-10">
+                <p className="text-gray-500">Đang tải thành tích...</p>
+            </div>
+        );
+    }
+
     // Xử lý trường hợp không tìm thấy học sinh (chưa đăng nhập hoặc ID không hợp lệ)
     if (!currentStudent) {
         return (
             <div className="text-center p-10 bg-yellow-50 rounded-lg">
-                <h2 className="text-xl font-bold text-yellow-800">Không tìm thấy thông tin học sinh!</h2>
+                <h2 className="text-xl font-bold text-yellow-800">Vui lòng chọn học sinh!</h2>
                 <p className="text-yellow-700 mt-2">Vui lòng quay lại và chọn tên của mình để xem thành tích.</p>
             </div>
         );
