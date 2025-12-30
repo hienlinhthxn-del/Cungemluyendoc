@@ -11,7 +11,7 @@ import { EditStudentModal, EditFormState } from '../components/EditStudentModal'
 import { ChangePasswordForm } from './ChangePasswordForm';
 import { saveCommunication, getCommunications, Communication } from '../services/communicationService';
 import { SystemHealthCheck } from '../components/SystemHealthCheck';
-import { getStudents, syncWithServer, resetToMock } from '../services/studentService';
+import { getStudents, saveStudents, syncWithServer } from '../services/studentService';
 
 export const TeacherDashboard: React.FC = () => {
   const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
@@ -317,13 +317,15 @@ export const TeacherDashboard: React.FC = () => {
       // 2. Cập nhật giao diện trước (Optimistic Update)
       const newStudents = students.filter(s => s.id !== id);
       setStudents(newStudents);
+      // Thông báo cho các component khác để cập nhật
+      window.dispatchEvent(new CustomEvent('students_updated'));
 
       // 3. Đồng bộ lên Server
       try {
         const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
         if (res.ok) {
-          // Nếu server xóa thành công, cập nhật LocalStorage
-          localStorage.setItem('app_students_data', JSON.stringify(newStudents));
+          // Nếu server xóa thành công, cập nhật LocalStorage qua service
+          saveStudents(newStudents);
           setNotification({ message: `Đã xóa học sinh ${name}`, type: 'success' });
         } else {
           console.error("Server delete failed");
@@ -395,8 +397,11 @@ export const TeacherDashboard: React.FC = () => {
     // 2. Update the React state with the new array.
     setStudents(updatedStudents);
 
-    // 3. Save the new array to LocalStorage.
-    localStorage.setItem('app_students_data', JSON.stringify(updatedStudents));
+    // 3. Save the new array to LocalStorage via the service.
+    saveStudents(updatedStudents);
+
+    // 3.1. Dispatch an event so other open tabs/components can update.
+    window.dispatchEvent(new CustomEvent('students_updated'));
 
     // 4. Sync the specific updated student to the server.
     const updatedStudent = updatedStudents.find(s => s.id === editingStudent.id);
@@ -586,7 +591,9 @@ export const TeacherDashboard: React.FC = () => {
     if (window.confirm(`Bạn có muốn chuyển TOÀN BỘ ${students.length} học sinh đang có trong hệ thống về lớp "${currentClass.name}" (Mã: ${classId}) không?`)) {
       const updatedStudents = students.map(s => ({ ...s, classId: classId }));
       setStudents(updatedStudents);
-      localStorage.setItem('app_students_data', JSON.stringify(updatedStudents));
+      saveStudents(updatedStudents);
+      // Thông báo cho các component khác để cập nhật
+      window.dispatchEvent(new CustomEvent('students_updated'));
       setNotification({ message: `Đã chuyển ${students.length} học sinh về lớp ${currentClass.name}`, type: 'success' });
       playSuccess();
     }

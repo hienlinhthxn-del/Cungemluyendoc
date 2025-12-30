@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Trash2, Users, ChevronLeft, X, UserPlus, Search, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { playClick, playSuccess, playError } from '../services/audioService';
-import { syncWithServer } from '../services/studentService';
+import { getStudents, saveStudents, syncWithServer } from '../services/studentService';
+import { StudentStats } from '../types';
 
 interface ClassGroup {
   id: string;
   name: string;
-  studentCount: number;
 }
 
 export const ClassManagerPage: React.FC = () => {
@@ -15,6 +15,7 @@ export const ClassManagerPage: React.FC = () => {
   const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
+  const [allStudents, setAllStudents] = useState<StudentStats[]>(() => getStudents());
   
   // State quản lý học sinh trong lớp
   const [selectedClass, setSelectedClass] = useState<ClassGroup | null>(null);
@@ -22,16 +23,27 @@ export const ClassManagerPage: React.FC = () => {
   const [currentStudents, setCurrentStudents] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Lắng nghe sự kiện cập nhật học sinh từ các trang khác để đồng bộ giao diện
+  useEffect(() => {
+    const handleStudentsUpdate = () => {
+      setAllStudents(getStudents());
+    };
+    window.addEventListener('students_updated', handleStudentsUpdate);
+    return () => window.removeEventListener('students_updated', handleStudentsUpdate);
+  }, []);
+
   useEffect(() => {
     // Tải danh sách lớp từ localStorage
     const savedClasses = localStorage.getItem('classes');
     if (savedClasses) {
-      setClasses(JSON.parse(savedClasses));
+      // Bỏ qua studentCount cũ nếu có, vì ta sẽ tính lại một cách chính xác
+      const parsedClasses = JSON.parse(savedClasses).map(({id, name}: any) => ({id, name}));
+      setClasses(parsedClasses);
     } else {
       // Dữ liệu mẫu nếu chưa có
       setClasses([
-        { id: '1', name: 'Lớp 1A', studentCount: 32 },
-        { id: '2', name: 'Lớp 1B', studentCount: 28 },
+        { id: '1', name: 'Lớp 1A' },
+        { id: '2', name: 'Lớp 1B' },
       ]);
     }
   }, []);
@@ -48,7 +60,6 @@ export const ClassManagerPage: React.FC = () => {
     const newClass: ClassGroup = {
       id: Date.now().toString(),
       name: newClassName,
-      studentCount: 0,
     };
 
     saveClasses([...classes, newClass]);
@@ -65,19 +76,17 @@ export const ClassManagerPage: React.FC = () => {
   // --- LOGIC QUẢN LÝ HỌC SINH ---
   const openClassDetails = (cls: ClassGroup) => {
     setSelectedClass(cls);
-    // Lấy danh sách học sinh từ localStorage chung của app
-    const allStudents = JSON.parse(localStorage.getItem('app_students_data') || '[]');
     // Lọc ra học sinh của lớp này
     const classStudents = allStudents.filter((s: any) => s.classId === cls.id);
     setCurrentStudents(classStudents);
   };
 
-  const handleAddStudentToClass = (e: React.FormEvent) => {
+  const handleAddStudentToClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim() || !selectedClass) return;
 
     // Tạo học sinh mới đúng cấu trúc
-    const newStudent = {
+    const newStudent: StudentStats = {
       id: `s${Date.now()}`,
       name: studentName,
       classId: selectedClass.id,
@@ -85,32 +94,33 @@ export const ClassManagerPage: React.FC = () => {
       averageScore: 0,
       readingSpeed: 0,
       history: [],
-      lastPractice: new Date(),
+      lastPractice: new Date().toISOString(),
       badges: []
     };
 
-    // 1. Lưu vào danh sách tổng
-    const allStudents = JSON.parse(localStorage.getItem('app_students_data') || '[]');
+    // 1. Cập nhật danh sách tổng và lưu vào localStorage (thông qua service)
     const updatedAllStudents = [...allStudents, newStudent];
-    localStorage.setItem('app_students_data', JSON.stringify(updatedAllStudents));
+    saveStudents(updatedAllStudents);
+    
+    // Thông báo cho các component khác biết để cập nhật
+    window.dispatchEvent(new CustomEvent('students_updated'));
 
     // 2. Cập nhật UI hiện tại
+    setAllStudents(updatedAllStudents);
     setCurrentStudents([...currentStudents, newStudent]);
     setStudentName('');
-
-    // 3. Cập nhật sĩ số lớp bên ngoài
-    const updatedClasses = classes.map(c => 
-      c.id === selectedClass.id ? { ...c, studentCount: c.studentCount + 1 } : c
-    );
-    setClasses(updatedClasses);
-    localStorage.setItem('classes', JSON.stringify(updatedClasses));
     
-    // (Tùy chọn) Gửi lên server nếu cần thiết kế đồng bộ sau
-    fetch('/api/students', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: newStudent.id, name: newStudent.name, classId: selectedClass.id })
-    }).catch(err => console.error("Failed to sync new student to server", err));
+    // 3. Đồng bộ học sinh mới lên server
+    try {
+      await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newStudent)
+      });
+    } catch (err) {
+      console.error("Failed to sync new student to server", err);
+      // Có thể thêm thông báo lỗi cho người dùng ở đây
+    }
     
     playSuccess();
   };
@@ -158,6 +168,17 @@ export const ClassManagerPage: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Tính toán sĩ số một cách linh hoạt và chính xác bằng useMemo
+  const classStudentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    allStudents.forEach(student => {
+      if (student.classId) {
+        counts.set(student.classId, (counts.get(student.classId) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [allStudents]);
+
   return (
     <div className="min-h-screen bg-blue-50 p-6">
       <div className="max-w-4xl mx-auto">
@@ -184,8 +205,10 @@ export const ClassManagerPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {classes.map((cls) => (
-            <div key={cls.id} 
+          {classes.map((cls) => {
+            const studentCount = classStudentCounts.get(cls.id) || 0;
+            return (
+              <div key={cls.id} 
               className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
               onClick={() => openClassDetails(cls)}
             >
@@ -196,7 +219,7 @@ export const ClassManagerPage: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-800">{cls.name}</h3>
-                    <p className="text-sm text-gray-500">{cls.studentCount} học sinh</p>
+                    <p className="text-sm text-gray-500">{studentCount} học sinh</p>
                   </div>
                 </div>
                 <button
@@ -214,7 +237,8 @@ export const ClassManagerPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* MODAL THÊM LỚP */}

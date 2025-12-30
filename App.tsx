@@ -16,6 +16,12 @@ import { Users, GraduationCap, Baby, Lock, X, KeyRound, ChevronRight } from 'luc
 import { playClick, playError, playSuccess } from './services/audioService';
 import { initializeStudentsIfEmpty } from './services/studentService';
 
+// Đề xuất: Sử dụng hằng số để tránh "magic strings" và lỗi gõ sai
+const LOCAL_STORAGE_KEYS = {
+  CURRENT_ROLE: 'current_role',
+  TEACHER_PASSWORD: 'teacher_password',
+};
+
 const TeacherLoginModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogin: () => void }> = ({ isOpen, onClose, onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -28,7 +34,7 @@ const TeacherLoginModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogi
     const defaultPassword = import.meta.env.VITE_TEACHER_PASSWORD;
     // Ưu tiên mật khẩu do người dùng đặt trong localStorage, sau đó mới đến mật khẩu mặc định.
     const correctPassword =
-      localStorage.getItem('teacher_password') ||
+      localStorage.getItem(LOCAL_STORAGE_KEYS.TEACHER_PASSWORD) ||
       defaultPassword;
 
     if (password === correctPassword) {
@@ -47,7 +53,7 @@ const TeacherLoginModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogi
     );
 
     if (isConfirmed) {
-      localStorage.removeItem('teacher_password');
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.TEACHER_PASSWORD);
       playSuccess();
       alert('Mật khẩu đã được đặt lại về mặc định. Bây giờ bạn có thể đăng nhập bằng mật khẩu mặc định.');
       setPassword(''); // Clear the input field
@@ -226,20 +232,66 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
+// Đề xuất: Tách các nhóm route ra thành các component riêng để dễ quản lý.
+// Lý tưởng nhất, mỗi component này nên nằm trong file riêng, ví dụ: `routes/StudentRoutes.tsx`.
+
+const StudentRoutes = () => (
+  <>
+    <Route path="/student" element={<StudentDashboard />} />
+    <Route path="/student/practice/:id" element={<ReadingPractice />} />
+    <Route path="/student/achievements" element={<AchievementsPage />} />
+    <Route path="/leaderboard" element={<LeaderboardPage />} />
+  </>
+);
+
+const TeacherRoutes = () => (
+  <>
+    <Route
+      path="/teacher"
+      element={
+        <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Giáo viên. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
+          <TeacherDashboard />
+        </ErrorBoundary>
+      }
+    />
+    <Route path="/teacher/reports" element={<ReportsPage />} />
+    <Route path="/teacher/lessons" element={<LessonManager />} />
+    <Route path="/teacher/classes" element={<ClassManagerPage />} />
+    <Route path="/teacher/lost-and-found" element={<LostAndFoundPage onBack={() => window.history.back()} />} />
+    <Route path="/leaderboard" element={<LeaderboardPage />} />
+    {/* Cho phép giáo viên truy cập trang luyện đọc để sửa giọng đọc mẫu */}
+    <Route path="/student/practice/:id" element={<ReadingPractice />} />
+  </>
+);
+
+const ParentRoutes = () => (
+  <>
+    <Route
+      path="/parent"
+      element={
+        <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Phụ huynh. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
+          <ParentDashboard />
+        </ErrorBoundary>
+      }
+    />
+    <Route path="/parent/contact" element={<div className="text-center p-10 text-gray-500">Trang liên hệ đang cập nhật...</div>} />
+  </>
+);
+
 const App: React.FC = () => {
   // Khởi tạo state từ localStorage để ghi nhớ vai trò người dùng
   const [role, setRole] = useState<UserRole | null>(() => {
-    const savedRole = localStorage.getItem('current_role');
+    const savedRole = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_ROLE);
     return savedRole ? (savedRole as UserRole) : null;
   });
 
   // Khi role thay đổi, lưu lại vào localStorage
   useEffect(() => {
     if (role) {
-      localStorage.setItem('current_role', role);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_ROLE, role);
     } else {
       // Khi đăng xuất (role là null), xoá luôn để quay về màn hình chọn vai trò
-      localStorage.removeItem('current_role');
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.CURRENT_ROLE);
     }
   }, [role]);
 
@@ -265,57 +317,22 @@ const App: React.FC = () => {
     }
   };
 
+  const renderRoutesByRole = () => {
+    switch (role) {
+      case UserRole.STUDENT: return <StudentRoutes />;
+      case UserRole.TEACHER: return <TeacherRoutes />;
+      case UserRole.PARENT: return <ParentRoutes />;
+      default: return null;
+    }
+  };
+
   return (
     <Router>
       <Layout role={role} onLogout={handleLogout}>
         <Routes>
           <Route path="/" element={<Navigate to={getDefaultRoute()} replace />} />
 
-          {/* Student Routes */}
-          {role === UserRole.STUDENT && (
-            <>
-              <Route path="/student" element={<StudentDashboard />} />
-              <Route path="/student/practice/:id" element={<ReadingPractice />} />
-              <Route path="/student/achievements" element={<AchievementsPage />} />
-              <Route path="/leaderboard" element={<LeaderboardPage />} />
-            </>
-          )}
-
-          {/* Teacher Routes */}
-          {role === UserRole.TEACHER && (
-            <>
-              <Route
-                path="/teacher"
-                element={
-                  <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Giáo viên. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
-                    <TeacherDashboard />
-                  </ErrorBoundary>
-                }
-              />
-              <Route path="/teacher/reports" element={<ReportsPage />} />
-              <Route path="/teacher/lessons" element={<LessonManager />} />
-              <Route path="/teacher/classes" element={<ClassManagerPage />} />
-              <Route path="/teacher/lost-and-found" element={<LostAndFoundPage onBack={() => window.history.back()} />} />
-              <Route path="/leaderboard" element={<LeaderboardPage />} />
-              {/* Cho phép giáo viên truy cập trang luyện đọc để sửa giọng đọc mẫu */}
-              <Route path="/student/practice/:id" element={<ReadingPractice />} />
-            </>
-          )}
-
-          {/* Parent Routes */}
-          {role === UserRole.PARENT && (
-            <>
-              <Route
-                path="/parent"
-                element={
-                  <ErrorBoundary fallbackMessage="Không thể tải Bảng điều khiển Phụ huynh. Vui lòng nhấn F12 và xem tab 'Console' để biết chi tiết lỗi.">
-                    <ParentDashboard />
-                  </ErrorBoundary>
-                }
-              />
-              <Route path="/parent/contact" element={<div className="text-center p-10 text-gray-500">Trang liên hệ đang cập nhật...</div>} />
-            </>
-          )}
+          {renderRoutesByRole()}
 
           {/* Fallback: Redirect to user's default route if they try to access a wrong page */}
           <Route path="*" element={<Navigate to={getDefaultRoute()} replace />} />
