@@ -3,7 +3,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { GeminiFeedbackSchema } from "../types";
 
 const getClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  // FIX: Access Vite environment variable correctly
+  // In Vite, process.env is empty in production. Must use import.meta.env.
+  // Also, variable MUST start with VITE_ to be exposed to client.
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("API Key not found. Using mock simulation.");
     return null;
