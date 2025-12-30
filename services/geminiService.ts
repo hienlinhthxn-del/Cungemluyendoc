@@ -56,20 +56,10 @@ export const evaluateReading = async (
   };
 
   try {
-    // Get the model - Use standard Flash model
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: schema as any, // Type cast for new SDK compatibility
-        temperature: 0.4
-      }
-    });
-
     let promptParts: any[] = [];
 
     if (audioBase64) {
-      // Multimodal prompt with Audio - STANDARD MODE
+      // Multimodal prompt with Audio
       promptParts = [
         {
           text: `Role: Vietnamese Grade 1 Reading Teacher (Standard Northern Accent).
@@ -105,21 +95,48 @@ export const evaluateReading = async (
       ];
     }
 
-    const result = await model.generateContent(promptParts);
-    const response = result.response;
-    const text = response.text();
+    // PRIMARY ATTEMPT: Gemini 1.5 Flash
+    try {
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: schema as any,
+          temperature: 0.4
+        }
+      });
 
-    if (text) {
-      return JSON.parse(text) as GeminiFeedbackSchema;
-    } else {
-      throw new Error("Empty response from AI");
+      const result = await model.generateContent(promptParts);
+      const response = result.response;
+      return JSON.parse(response.text()) as GeminiFeedbackSchema;
+
+    } catch (primaryError: any) {
+      console.warn("Primary Model Failed, trying Fallback (Gemini Pro)...", primaryError);
+
+      // FALLBACK ATTEMPT: Gemini Pro (v1.0 - Very Stable)
+      const fallbackModel = genAI.getGenerativeModel({
+        model: "gemini-pro",
+        generationConfig: {
+          responseMimeType: "application/json", // Note: gemini-pro might struggle with JSON mode in old versions but 0.21.0 handles it better
+          temperature: 0.4
+        }
+      });
+
+      const fallbackResult = await fallbackModel.generateContent(promptParts);
+      const fallbackResponse = fallbackResult.response;
+
+      // Clean up json if needed (gemini-pro sometimes adds markdown)
+      let cleanText = fallbackResponse.text();
+      cleanText = cleanText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+      return JSON.parse(cleanText) as GeminiFeedbackSchema;
     }
 
   } catch (error) {
-    console.error("Gemini Grading Error:", error);
+    console.error("Gemini Grading Error (All Models Failed):", error);
     return {
       ...getMockResponse(userSpokenText),
-      teacher_notes: `Error: ${error instanceof Error ? error.message : String(error)}. Switched to Mock mode.`,
+      teacher_notes: `Error: ${error instanceof Error ? error.message : String(error)}. Both Flash and Pro models failed.`,
       encouraging_comment: "Có lỗi kết nối nên cô chưa chấm chính xác được. (Chế độ giả lập 0 điểm)"
     };
   }
