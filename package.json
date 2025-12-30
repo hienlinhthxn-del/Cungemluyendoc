@@ -3,15 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "engines": { "node": "^20.11.0" },
+  "engines": {
+    "node": "^20.11.0"
+  },
   "scripts": {
-    "dev": "concurrently \"vite\" \"nodemon server/index.js\"",    "build": "vite build",
+    "dev": "concurrently \"vite\" \"nodemon server/index.js\"",
+    "build": "vite build",
     "preview": "vite preview",
     "start": "node server/index.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "@google/genai": "^1.31.0",
+    "@google/generative-ai": "^0.12.0",
     "cloudinary": "^2.8.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

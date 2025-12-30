@@ -1,17 +1,15 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, Part } from "@google/generative-ai";
 import { GeminiFeedbackSchema } from "../types";
 
 const getClient = () => {
   // FIX: Access Vite environment variable correctly
-  // In Vite, process.env is empty in production. Must use import.meta.env.
-  // Also, variable MUST start with VITE_ to be exposed to client.
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("API Key not found. Using mock simulation.");
     return null;
   }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenerativeAI(apiKey);
 };
 
 export const evaluateReading = async (
@@ -20,11 +18,11 @@ export const evaluateReading = async (
   audioBase64?: string,
   mimeType: string = 'audio/webm'
 ): Promise<GeminiFeedbackSchema> => {
-  const ai = getClient();
+  const genAI = getClient();
 
   // Helper for mock response
   const getMockResponse = (spoken: string): GeminiFeedbackSchema => ({
-    score: 0, // Set to 0 to indicate FAILURE/MOCK mode clearly
+    score: 0,
     mispronounced_words: ["Lỗi", "Kết", "Nối", "API"],
     encouraging_comment: "Hệ thống chưa kết nối được với AI chấm điểm. Vui lòng kiểm tra API Key hoặc mạng.",
     teacher_notes: "DEBUG INFO: Using Mock/Fallback. Logic AI chưa chạy. Nguyên nhân: Không tìm thấy API Key hoặc Lỗi kết nối.",
@@ -32,7 +30,7 @@ export const evaluateReading = async (
   });
 
   // Fallback for demo if no API key
-  if (!ai) {
+  if (!genAI) {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(getMockResponse(userSpokenText));
@@ -40,28 +38,39 @@ export const evaluateReading = async (
     });
   }
 
+  // Schema for structured output (JSON Mode)
   const schema = {
-    type: Type.OBJECT,
+    type: "OBJECT",
     properties: {
-      score: { type: Type.INTEGER, description: "Score from 0 to 100 based on phonetic accuracy." },
+      score: { type: "INTEGER", description: "Score from 0 to 100 based on phonetic accuracy." },
       mispronounced_words: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-        description: "List of words the student mispronounced (wrong tone, wrong vowel/consonant)."
+        type: "ARRAY",
+        items: { type: "STRING" },
+        description: "List of words the student mispronounced."
       },
-      encouraging_comment: { type: Type.STRING, description: "A short, friendly, encouraging comment in Vietnamese." },
-      teacher_notes: { type: Type.STRING, description: "Technical analysis of errors (e.g., 'Ngọng L/N', 'Sai dấu ngã')." },
-      spoken_text: { type: Type.STRING, description: "The exact Vietnamese transcription of what was heard." }
+      encouraging_comment: { type: "STRING", description: "A short, friendly, encouraging comment in Vietnamese." },
+      teacher_notes: { type: "STRING", description: "Technical analysis of errors." },
+      spoken_text: { type: "STRING", description: "The exact Vietnamese transcription of what was heard." }
     },
     required: ["score", "mispronounced_words", "encouraging_comment", "teacher_notes", "spoken_text"]
   };
 
   try {
-    let parts: any[] = [];
+    // Get the model - Use standard Flash model
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: schema as any, // Type cast for new SDK compatibility
+        temperature: 0.4
+      }
+    });
+
+    let promptParts: any[] = [];
 
     if (audioBase64) {
-      // Multimodal prompt with Audio - STANDARD MODE (Reverted as requested)
-      parts = [
+      // Multimodal prompt with Audio - STANDARD MODE
+      promptParts = [
         {
           text: `Role: Vietnamese Grade 1 Reading Teacher (Standard Northern Accent).
           
@@ -86,7 +95,7 @@ export const evaluateReading = async (
       ];
     } else {
       // Text-only fallback
-      parts = [
+      promptParts = [
         {
           text: `Role: Vietnamese Grade 1 Reading Teacher.
           Target Text: "${targetText}"
@@ -96,25 +105,18 @@ export const evaluateReading = async (
       ];
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash-001', // Explicit version for reliability
-      contents: { parts },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-        temperature: 0.4 // Standard temperature
-      }
-    });
+    const result = await model.generateContent(promptParts);
+    const response = result.response;
+    const text = response.text();
 
-    if (response.text) {
-      return JSON.parse(response.text) as GeminiFeedbackSchema;
+    if (text) {
+      return JSON.parse(text) as GeminiFeedbackSchema;
     } else {
       throw new Error("Empty response from AI");
     }
 
   } catch (error) {
     console.error("Gemini Grading Error:", error);
-    // Explicit Fallback to Mock instead of error message
     return {
       ...getMockResponse(userSpokenText),
       teacher_notes: `Error: ${error instanceof Error ? error.message : String(error)}. Switched to Mock mode.`,
