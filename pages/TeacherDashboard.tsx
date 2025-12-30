@@ -54,17 +54,17 @@ export const TeacherDashboard: React.FC = () => {
     setClassId(savedClassId);
     const initialStudents = getStudents();
     setStudents(initialStudents);
-
+    
     const fetchData = async () => {
-      // 1. Fetch Lessons
-      const lessonData = await getLessons();
-      // Đảm bảo lessonData là một mảng trước khi cập nhật state
-      if (Array.isArray(lessonData) && lessonData.length > 0) {
-        setAllLessons(lessonData);
-      }
-
-      // 2. Fetch Classes
       try {
+        // 1. Fetch Lessons
+        const lessonData = await getLessons();
+        // Đảm bảo lessonData là một mảng trước khi cập nhật state
+        if (Array.isArray(lessonData) && lessonData.length > 0) {
+          setAllLessons(lessonData);
+        }
+
+        // 2. Fetch Classes
         // Ưu tiên lấy từ LocalStorage (do trang Quản Lý Lớp lưu ở đây) để đồng bộ dữ liệu
         const savedClasses = localStorage.getItem('classes');
         if (savedClasses) {
@@ -76,6 +76,8 @@ export const TeacherDashboard: React.FC = () => {
             console.warn("Dữ liệu lớp học trong localStorage không hợp lệ, sẽ được bỏ qua.");
           }
         } else {
+          // This part is likely for a full-stack setup and might not be used
+          // in a client-side only deployment. It's safe to keep.
           const res = await fetch('/api/classes');
           if (res.ok) {
             const classData = await res.json();
@@ -83,7 +85,10 @@ export const TeacherDashboard: React.FC = () => {
           }
         }
       } catch (e) {
-        console.error("Không thể tải danh sách lớp học:", e);
+        console.error("Không thể tải dữ liệu ban đầu:", e);
+        setError("Lỗi tải dữ liệu. Vui lòng kiểm tra kết nối và thử lại.");
+      } finally {
+        setIsLoading(false); // Quan trọng: Đặt lại trạng thái loading sau khi tải xong
       }
     };
     fetchData();
