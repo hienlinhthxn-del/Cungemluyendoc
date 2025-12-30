@@ -60,34 +60,22 @@ export const evaluateReading = async (
     let parts: any[] = [];
 
     if (audioBase64) {
-      // Multimodal prompt with Audio - TUNED FOR VIETNAMESE ACCURACY (STRICT MODE V2)
+      // Multimodal prompt with Audio - STANDARD MODE (Reverted as requested)
       parts = [
         {
-          text: `Role: Extremely Strict Vietnamese Grade 1 Reading Teacher (Standard Northern Accent).
+          text: `Role: Vietnamese Grade 1 Reading Teacher (Standard Northern Accent).
           
           Task: Evaluate the student's pronunciation of: "${targetText}".
           
-          CRITICAL INSTRUCTION: You must be UNFORGIVING with errors.
-          
-          1. **ZERO TOLERANCE for Tone Errors**:
-             - Target: "Ngã" -> Student: "Ngả" (Hỏi) => WRONG. mark "Ngã" as mispronounced.
-             - Target: "Lá" -> Student: "La" (No tone) => WRONG.
-          
-          2. **ZERO TOLERANCE for Initial Consonants**:
-             - Target: "Lúa" -> Student: "Núa" => WRONG. mark "Lúa" as mispronounced.
-             - Target: "Trâu" -> Student: "Châu" => WRONG.
-          
-          3. **Transcribe EXACTLY**:
-             - If student says "Nàm", write "Nàm". Do not correct it to "Làm".
-          
-          4. **Output Criteria**:
-             - 'score': 100 (Perfect), 90 (1 minor error), <80 (Any tone/consonant error).
-             - 'mispronounced_words': List EVERY word from the target text that wasn't perfect.
-               - Example: Target "Bé ngủ ngon". Student says "Bé ngủ ngonn". If "ngon" sounds weird, list it.
-               - Example: Target "Con Hổ". Student says "Con Hố". List "Hổ".
-          
-          5. **Feedback**:
-             - Be kind in the 'encouraging_comment' but brutal in the 'mispronounced_words' list.`
+          Instructions:
+          1. Listen to the audio and compare with target text.
+          2. Transcribe what you hear into 'spoken_text'.
+          3. Identify clearly mispronounced words in 'mispronounced_words'.
+          4. Grading:
+             - 90-100: Very good.
+             - 80-89: Good.
+             - <80: Needs improvement.
+          5. Provide encouragement.`
         },
         {
           inlineData: {
@@ -100,23 +88,21 @@ export const evaluateReading = async (
       // Text-only fallback
       parts = [
         {
-          text: `Role: Strict Vietnamese Grade 1 Reading Teacher.
+          text: `Role: Vietnamese Grade 1 Reading Teacher.
           Target Text: "${targetText}"
           Student Input: "${userSpokenText}"
-          
-          Compare word-for-word. Any difference (typo, missing word) is a WRONG word.
-          Output JSON.`
+          Output JSON matching schema.`
         }
       ];
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash-001', // Use explicit version instead of alias to fix 404
+      model: 'gemini-pro', // SWITCH TO GEMINI PRO (V1.0) -> MOST STABLE MODEL
       contents: { parts },
       config: {
         responseMimeType: "application/json",
         responseSchema: schema,
-        temperature: 0.1 // Ultra low temperature for determinism
+        temperature: 0.4 // Standard temperature
       }
     });
 
