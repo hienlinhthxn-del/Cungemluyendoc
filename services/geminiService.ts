@@ -111,7 +111,7 @@ export const evaluateReading = async (
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash', // Revert to Flash for stability
+      model: 'gemini-1.5-flash-001', // Use explicit version instead of alias to fix 404
       contents: { parts },
       config: {
         responseMimeType: "application/json",
