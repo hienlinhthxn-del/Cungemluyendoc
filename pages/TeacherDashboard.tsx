@@ -46,20 +46,26 @@ export const TeacherDashboard: React.FC = () => {
       }
 
       // 2. Fetch Classes
-      // Ưu tiên lấy từ LocalStorage (do trang Quản Lý Lớp lưu ở đây) để đồng bộ dữ liệu
-      const savedClasses = localStorage.getItem('classes');
-      if (savedClasses) {
-        setClasses(JSON.parse(savedClasses));
-      } else {
-        try {
+      try {
+        // Ưu tiên lấy từ LocalStorage (do trang Quản Lý Lớp lưu ở đây) để đồng bộ dữ liệu
+        const savedClasses = localStorage.getItem('classes');
+        if (savedClasses) {
+          const parsedClasses = JSON.parse(savedClasses);
+          // Đảm bảo dữ liệu là một mảng trước khi set state để tránh lỗi render
+          if (Array.isArray(parsedClasses)) {
+            setClasses(parsedClasses);
+          } else {
+            console.warn("Dữ liệu lớp học trong localStorage không hợp lệ, sẽ được bỏ qua.");
+          }
+        } else {
           const res = await fetch('/api/classes');
           if (res.ok) {
             const classData = await res.json();
             setClasses(classData);
           }
-        } catch (e) {
-          console.error("Failed to load classes", e);
         }
+      } catch (e) {
+        console.error("Không thể tải danh sách lớp học:", e);
       }
     };
     fetchData();
