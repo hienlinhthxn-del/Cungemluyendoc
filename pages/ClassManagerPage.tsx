@@ -15,7 +15,8 @@ export const ClassManagerPage: React.FC = () => {
   const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
-  const [allStudents, setAllStudents] = useState<StudentStats[]>(() => getStudents());
+  // Khởi tạo state rỗng để an toàn cho SSR. Dữ liệu sẽ được tải trong useEffect.
+  const [allStudents, setAllStudents] = useState<StudentStats[]>([]);
   
   // State quản lý học sinh trong lớp
   const [selectedClass, setSelectedClass] = useState<ClassGroup | null>(null);
@@ -25,6 +26,9 @@ export const ClassManagerPage: React.FC = () => {
 
   // Lắng nghe sự kiện cập nhật học sinh từ các trang khác để đồng bộ giao diện
   useEffect(() => {
+    // Tải dữ liệu học sinh ban đầu một cách an toàn ở phía client
+    setAllStudents(getStudents());
+
     const handleStudentsUpdate = () => {
       setAllStudents(getStudents());
     };

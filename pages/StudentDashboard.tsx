@@ -12,11 +12,13 @@ import { getStudents, syncWithServer } from '../services/studentService';
 
 export const StudentDashboard: React.FC = () => {
   // Class ID State
-  const [classId, setClassId] = useState<string | null>(() => localStorage.getItem('student_class_id'));
+  // Khởi tạo state với `undefined` để biết đang chờ tải từ client.
+  const [classId, setClassId] = useState<string | null | undefined>(undefined);
   const [classInput, setClassInput] = useState('');
 
   // Load students from service
-  const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
+  // Khởi tạo state rỗng, sẽ được tải trong useEffect.
+  const [students, setStudents] = useState<StudentStats[]>([]);
 
   // Dynamic Lessons
   const [allLessons, setAllLessons] = useState<Lesson[]>([]);
@@ -24,6 +26,18 @@ export const StudentDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Tải dữ liệu từ localStorage một cách an toàn ở phía client.
+    const savedClassId = localStorage.getItem('student_class_id');
+    setClassId(savedClassId); // Sẽ là null nếu không có
+
+    const initialStudents = getStudents();
+    setStudents(initialStudents);
+
+    // Tải thông tin học sinh đã chọn
+    const savedStudentId = localStorage.getItem('current_student_id');
+    const studentData = savedStudentId ? initialStudents.find(s => s.id === savedStudentId) : null;
+    setSelectedStudent(studentData || null);
+
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
@@ -41,11 +55,7 @@ export const StudentDashboard: React.FC = () => {
   }, []);
 
   // Student Selection State
-  const [selectedStudent, setSelectedStudent] = useState<StudentStats | null>(() => {
-    const savedId = localStorage.getItem('current_student_id');
-    const currentStudents = getStudents();
-    return currentStudents.find(s => s.id === savedId) || null;
-  });
+  const [selectedStudent, setSelectedStudent] = useState<StudentStats | null | undefined>(undefined);
 
   // Reload data when component mounts or Class ID changes
   useEffect(() => {
@@ -103,7 +113,7 @@ export const StudentDashboard: React.FC = () => {
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   ), [searchTerm, students]);
 
-  const currentStudent = selectedStudent || students[0] || MOCK_STUDENTS[0]; // Fallback
+  const currentStudent = selectedStudent; // Chỉ dùng selectedStudent
 
   // Danh sách các lời chào ngộ nghĩnh (đã bỏ tên riêng)
   const funGreetings = [
@@ -146,7 +156,11 @@ export const StudentDashboard: React.FC = () => {
   }, [selectedStudent]);
 
   // SCREEN 1: CLASS SELECTION
-  if (!classId) {
+  // Chờ cho đến khi classId được tải xong (không còn là undefined)
+  if (classId === undefined) {
+    return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 p-4"><p className="text-white">Đang tải...</p></div>;
+  }
+  if (classId === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center space-y-6 animate-fade-in-up">
@@ -178,7 +192,11 @@ export const StudentDashboard: React.FC = () => {
   }
 
   // SCREEN 2: STUDENT SELECTION
-  if (!selectedStudent) {
+  // Thêm điều kiện chờ selectedStudent được tải xong (không còn là undefined)
+  if (selectedStudent === undefined) {
+    return <div className="text-center p-10">Đang kiểm tra thông tin đăng nhập...</div>;
+  }
+  if (!selectedStudent && classId) { // Chỉ hiển thị màn hình chọn khi đã có classId
     return (
       <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up relative">
         <button
@@ -246,7 +264,7 @@ export const StudentDashboard: React.FC = () => {
     );
   }
 
-  if (isLoading) {
+  if (isLoading || !currentStudent) {
     return <div className="text-center p-10">Đang tải bài học...</div>;
   }
 
@@ -301,7 +319,7 @@ export const StudentDashboard: React.FC = () => {
           </div>
           <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-blue-100" />
-            <span className="font-bold">{currentStudent.completedLessons} Bài đã học</span>
+            <span className="font-bold">{currentStudent?.completedLessons || 0} Bài đã học</span>
           </div>
         </div>
       </div>
@@ -318,7 +336,7 @@ export const StudentDashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...allLessons].sort((a, b) => a.week - b.week).map((lesson, index) => {
             // Determine completion based on index vs completed count
-            const isCompleted = index < currentStudent.completedLessons;
+            const isCompleted = index < (currentStudent?.completedLessons || 0);
 
             return (
               <Link

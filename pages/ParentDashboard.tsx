@@ -10,7 +10,8 @@ import { getCommunications, saveCommunication, Communication } from '../services
 import { getStudents, syncWithServer } from '../services/studentService';
 
 export const ParentDashboard: React.FC = () => {
-  const [students, setStudents] = useState<StudentStats[]>(() => getStudents());
+  // Khởi tạo state rỗng để an toàn cho SSR. Dữ liệu sẽ được tải trong useEffect.
+  const [students, setStudents] = useState<StudentStats[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentStats | null>(null); // Khởi tạo là null
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);

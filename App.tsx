@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { ReadingPractice } from './pages/ReadingPractice';
@@ -16,9 +16,6 @@ import { Users, GraduationCap, Baby, Lock, X, KeyRound, ChevronRight } from 'luc
 import { playClick, playError, playSuccess } from './services/audioService';
 import { initializeStudentsIfEmpty } from './services/studentService';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { StudentRoutes } from './components/StudentRoutes';
-import { TeacherRoutes } from './components/TeacherRoutes';
-import { ParentRoutes } from './components/ParentRoutes';
 
 // Đề xuất: Sử dụng hằng số để tránh "magic strings" và lỗi gõ sai
 const LOCAL_STORAGE_KEYS = {
@@ -190,11 +187,14 @@ const RoleSelector: React.FC<{ onSelect: (role: UserRole) => void }> = ({ onSele
 
 const App: React.FC = () => {
   // Khởi tạo state từ localStorage để ghi nhớ vai trò người dùng
-  const [role, setRole] = useState<UserRole | null>(() => {
-    const savedRole = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_ROLE);
-    return savedRole ? (savedRole as UserRole) : null;
-  });
+  // Khởi tạo là `undefined` để biết đang chờ tải từ client.
+  const [role, setRole] = useState<UserRole | null | undefined>(undefined);
 
+  useEffect(() => {
+    // Tải vai trò từ localStorage một cách an toàn ở phía client.
+    const savedRole = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_ROLE);
+    setRole(savedRole ? (savedRole as UserRole) : null);
+  }, []);
   // Khi role thay đổi, lưu lại vào localStorage
   useEffect(() => {
     if (role) {
@@ -203,7 +203,7 @@ const App: React.FC = () => {
       // Khi đăng xuất (role là null), xoá luôn để quay về màn hình chọn vai trò
       localStorage.removeItem(LOCAL_STORAGE_KEYS.CURRENT_ROLE);
     }
-  }, [role]);
+  }, [role]); // Chạy khi role thay đổi (trừ lần đầu là undefined)
 
   // Initialize data on first load
   useEffect(() => {
@@ -214,7 +214,11 @@ const App: React.FC = () => {
     setRole(null);
   };
 
-  if (!role) {
+  // Hiển thị màn hình tải trong khi chờ đọc localStorage
+  if (role === undefined) {
+    return <div className="min-h-screen bg-blue-50 flex items-center justify-center"><p>Đang khởi động ứng dụng...</p></div>;
+  }
+  if (role === null) {
     return <RoleSelector onSelect={setRole} />;
   }
 
@@ -227,15 +231,6 @@ const App: React.FC = () => {
     }
   };
 
-  const renderRoutesByRole = () => {
-    switch (role) {
-      case UserRole.STUDENT: return <StudentRoutes />;
-      case UserRole.TEACHER: return <TeacherRoutes />;
-      case UserRole.PARENT: return <ParentRoutes />;
-      default: return null;
-    }
-  };
-
   return (
     <Router>
       <Layout role={role} onLogout={handleLogout}>
@@ -243,7 +238,33 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Navigate to={getDefaultRoute()} replace />} />
 
-            {renderRoutesByRole()}
+            {role === UserRole.STUDENT && (
+              <>
+                <Route path="/student" element={<StudentDashboard />} />
+                <Route path="/student/practice/:id" element={<ReadingPractice />} />
+                <Route path="/achievements" element={<AchievementsPage />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+              </>
+            )}
+
+            {role === UserRole.TEACHER && (
+              <>
+                <Route path="/teacher" element={<TeacherDashboard />} />
+                <Route path="/teacher/lessons" element={<LessonManager />} />
+                <Route path="/teacher/classes" element={<ClassManagerPage />} />
+                <Route path="/teacher/reports" element={<ReportsPage />} />
+                <Route path="/teacher/lost-and-found" element={<LostAndFoundPage onBack={() => window.history.back()} />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+              </>
+            )}
+
+            {role === UserRole.PARENT && (
+              <>
+                <Route path="/parent" element={<ParentDashboard />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+                <Route path="/achievements" element={<AchievementsPage />} />
+              </>
+            )}
 
             {/* Fallback: Redirect to user's default route if they try to access a wrong page */}
             <Route path="*" element={<Navigate to={getDefaultRoute()} replace />} />

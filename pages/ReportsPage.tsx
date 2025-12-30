@@ -7,18 +7,23 @@ import { LESSONS } from '../constants';
 
 export const ReportsPage: React.FC = () => {
     const [students, setStudents] = useState<StudentStats[]>([]);
-    const [classId] = useState(() => localStorage.getItem('teacher_class_id') || 'DEFAULT');
+    // Khởi tạo state với giá trị null để biết là đang chờ tải.
+    const [classId, setClassId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Tải classId từ localStorage một cách an toàn ở phía client.
+        const savedClassId = localStorage.getItem('teacher_class_id') || 'DEFAULT';
+        setClassId(savedClassId);
+
         const fetchData = async () => {
             setLoading(true);
-            await syncWithServer(classId);
+            await syncWithServer(savedClassId); // Dùng giá trị vừa lấy được
             setStudents(getStudents());
             setLoading(false);
         };
         fetchData();
-    }, [classId]);
+    }, []); // Chỉ chạy 1 lần khi component mount
 
     // Thống kê số lượng bài nộp theo tuần
     const weeklySubmissionData = useMemo(() => {
@@ -74,7 +79,7 @@ export const ReportsPage: React.FC = () => {
         document.body.removeChild(link);
     };
 
-    if (loading) {
+    if (loading || !classId) { // Thêm điều kiện !classId để chờ classId được set
         return <div className="p-8 text-center text-gray-500">Đang tải dữ liệu báo cáo...</div>;
     }
 

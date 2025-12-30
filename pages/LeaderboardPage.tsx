@@ -7,18 +7,22 @@ import { playClick } from '../services/audioService';
 export const LeaderboardPage: React.FC = () => {
     const [students, setStudents] = useState<StudentStats[]>([]);
     const [loading, setLoading] = useState(true);
-    // Lấy classId từ localStorage của học sinh hoặc giáo viên (tùy ai đang xem)
-    const classId = localStorage.getItem('student_class_id') || localStorage.getItem('teacher_class_id') || 'DEFAULT';
+    // Khởi tạo classId là null để chờ tải từ client
+    const [classId, setClassId] = useState<string | null>(null);
 
     useEffect(() => {
         const init = async () => {
+            // Tải classId từ localStorage một cách an toàn ở phía client
+            const savedClassId = localStorage.getItem('student_class_id') || localStorage.getItem('teacher_class_id') || 'DEFAULT';
+            setClassId(savedClassId);
+
             setLoading(true);
-            await syncWithServer(classId);
+            await syncWithServer(savedClassId);
             setStudents(getStudents());
             setLoading(false);
         };
         init();
-    }, [classId]);
+    }, []); // Chỉ chạy một lần khi component mount
 
     // CATEGORY 1: SIÊU SAO ĐIỂM SỐ (Average Score)
     const topScoreStudents = useMemo(() => {
@@ -74,7 +78,7 @@ export const LeaderboardPage: React.FC = () => {
         );
     };
 
-    if (loading) {
+    if (loading || !classId) {
         return (
             <div className="p-8 text-center text-gray-500">
                 Đang tải bảng xếp hạng...
