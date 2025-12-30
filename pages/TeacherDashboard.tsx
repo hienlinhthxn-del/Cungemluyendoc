@@ -129,23 +129,31 @@ export const TeacherDashboard: React.FC = () => {
 
   useEffect(() => {
     // Load feedback from parents
-    const loadData = () => {
+    const handleDataUpdate = () => {
+      // This function is called on initial load and when 'students_updated' is dispatched.
+      const newStudentsFromStorage = getStudents();
+
+      // SAFETY CHECK: Prevent data wipe.
+      // If the new data is empty but the current state has data, it's likely a bad sync.
+      // We log it, show a notification, and restore the previous data to localStorage.
+      if (newStudentsFromStorage.length === 0 && students.length > 0) {
+        console.warn("Sync resulted in 0 students. Restoring previous data to prevent loss.");
+        setNotification({ message: "Lỗi đồng bộ: Dữ liệu trên máy đã được bảo vệ.", type: 'error' });
+        saveStudents(students); // Restore localStorage with the data from the current state.
+        return; // Stop further execution to prevent UI update with empty data.
+      }
+
       const allComms = getCommunications();
       const feedback = allComms.filter(c => c.sender === 'PARENT');
       setParentFeedback(feedback);
-      setStudents(getStudents()); // Refresh students data
+      setStudents(newStudentsFromStorage); // Refresh students data
     };
 
-    loadData();
-    window.addEventListener('students_updated', loadData);
+    handleDataUpdate(); // Initial load
+    window.addEventListener('students_updated', handleDataUpdate);
 
-    // CHẨN ĐOÁN: Tạm thời vô hiệu hóa việc tự động đồng bộ khi tải trang.
-    // Việc này giúp ngăn dữ liệu mới trên máy bị dữ liệu cũ từ server ghi đè.
-    // Bạn có thể bật lại dòng này sau khi logic đồng bộ được cải thiện, hoặc chỉ đồng bộ khi nhấn nút "Làm mới".
-    // syncWithServer(classId);
-
-    return () => window.removeEventListener('students_updated', loadData);
-  }, [classId]);
+    return () => window.removeEventListener('students_updated', handleDataUpdate);
+  }, [classId, students]); // Add `students` to dependency array to get its latest value inside the handler
 
   // Add Student Modal State
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
