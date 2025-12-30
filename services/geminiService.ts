@@ -57,25 +57,27 @@ export const evaluateReading = async (
     let parts: any[] = [];
 
     if (audioBase64) {
-      // Multimodal prompt with Audio - TUNED FOR VIETNAMESE ACCURACY
+      // Multimodal prompt with Audio - TUNED FOR VIETNAMESE ACCURACY (STRICT MODE)
       parts = [
         {
-          text: `Role: Strict Vietnamese Grade 1 Reading Teacher (Standard Northern Accent / Giọng Miền Bắc).
+          text: `Role: Extremely Strict Vietnamese Grade 1 Reading Teacher (Standard Northern Accent / Giọng Miền Bắc).
           
           Task: Evaluate the pronunciation of the following student recording against the target text: "${targetText}".
           
           Instructions:
-          1. Transcribe EXACTLY what the student said into 'spoken_text'. Do not auto-correct. If they said "lói" instead of "nói", transcribe "lói".
-          2. Listen carefully for Tones (Dấu thanh). Incorrect tones (hỏi/ngã, sắc/nặng) are errors.
-          3. Compare the transcription with the Target Text.
-          4. Grading Criteria:
-             - 95-100: Perfect pronunciation, native Northern tones.
-             - 85-94: Clear, understandable, maybe 1 minor tone slip.
-             - 70-84: Understandable but several tone/consonant errors (ngọng).
-             - <70: Hard to understand, wrong words, or mostly silence.
-          5. Return 'mispronounced_words' as the words from the TARGET text that were read incorrectly.
-          6. Provide a 'encouraging_comment' for a 6-year-old child.
-          7. Provide 'teacher_notes' identifying specific phonetic errors (e.g., "Sai dấu hỏi/ngã", "Ngọng l/n").`
+          1. Transcribe EXACTLY what the student said into 'spoken_text'. Capturing every error (e.g., "Hà Lội" instead of "Hà Nội").
+          2. STRICTLY check for Tones (Dấu thanh). Dấu Hỏi vs Dấu Ngã must be perfect.
+          3. STRICTLY check for Initial Consonants (L/N, Tr/Ch, S/X, R/D/Gi). ANY deviation is an error.
+          4. Compare the transcription with the Target Text **Word-by-Word**.
+          5. Grading Criteria:
+             - 100: Absolute perfection, native standard.
+             - 90-99: Very good, maybe 1 very subtle imperfection.
+             - 80-89: Good, but 1 clear error (wrong tone or consonant).
+             - <80: Multiple errors (ngọng, sai dấu).
+             - <50: Wrong text or unintelligible.
+          6. 'mispronounced_words': List ALL words from the TARGET text that were not pronounced perfectly. Matches must be exact.
+          7. 'encouraging_comment': Short, specific encouragement in Vietnamese.
+          8. 'teacher_notes': List the specific errors found (e.g., "Sai từ 'Hà' thành 'Hả'", "Ngọng L/N ở từ 'Lúa'").`
         },
         {
           inlineData: {
@@ -88,13 +90,13 @@ export const evaluateReading = async (
       // Text-only fallback
       parts = [
         {
-          text: `Role: Vietnamese Grade 1 Reading Teacher.
+          text: `Role: Strict Vietnamese Grade 1 Reading Teacher.
           Target Text: "${targetText}"
           Student Input: "${userSpokenText}"
           
-          1. Compare Student Input to Target Text.
-          2. Check for missing words or typos that indicate mispronunciation.
-          3. Grade strictness: High.
+          1. Compare Student Input to Target Text word-for-word.
+          2. Identify any mismatch as a mispronunciation.
+          3. Grade strictness: 10/10.
           4. Output JSON matching the schema.`
         }
       ];
@@ -106,7 +108,7 @@ export const evaluateReading = async (
       config: {
         responseMimeType: "application/json",
         responseSchema: schema,
-        temperature: 0.2 // Lower temperature for more consistent/strict grading
+        temperature: 0.1 // Ultra low temperature for determinism
       }
     });
 
