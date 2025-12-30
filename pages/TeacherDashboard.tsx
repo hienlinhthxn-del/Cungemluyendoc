@@ -33,7 +33,12 @@ export const TeacherDashboard: React.FC = () => {
 
   // Dynamic Weeks based on actual lessons
   const weeks = useMemo(() => {
-    return Array.from(new Set(allLessons.map(l => l.week))).sort((a: number, b: number) => b - a);
+    // Lọc bỏ các tuần không hợp lệ (undefined, null) và sắp xếp để tránh lỗi runtime.
+    // Lỗi xảy ra khi .sort() cố gắng so sánh một số với `undefined`.
+    const validWeeks = allLessons
+      .map(l => l.week)
+      .filter((w): w is number => typeof w === 'number' && !isNaN(w));
+    return Array.from(new Set(validWeeks)).sort((a, b) => b - a);
   }, [allLessons]);
 
   // Fetch Lessons and Classes on mount
@@ -41,7 +46,8 @@ export const TeacherDashboard: React.FC = () => {
     const fetchData = async () => {
       // 1. Fetch Lessons
       const lessonData = await getLessons();
-      if (lessonData.length > 0) {
+      // Đảm bảo lessonData là một mảng trước khi cập nhật state
+      if (Array.isArray(lessonData) && lessonData.length > 0) {
         setAllLessons(lessonData);
       }
 
