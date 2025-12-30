@@ -3,7 +3,6 @@ import { GoogleGenerativeAI, Part } from "@google/generative-ai";
 import { GeminiFeedbackSchema } from "../types";
 
 const getClient = () => {
-  // FIX: Access Vite environment variable correctly
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     console.warn("API Key not found. Using mock simulation.");
@@ -29,7 +28,6 @@ export const evaluateReading = async (
     spoken_text: spoken || "Không nghe thấy gì...",
   });
 
-  // Fallback for demo if no API key
   if (!genAI) {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -38,7 +36,6 @@ export const evaluateReading = async (
     });
   }
 
-  // Schema for structured output (JSON Mode)
   const schema = {
     type: "OBJECT",
     properties: {
@@ -59,7 +56,6 @@ export const evaluateReading = async (
     let promptParts: any[] = [];
 
     if (audioBase64) {
-      // Multimodal prompt with Audio
       promptParts = [
         {
           text: `Role: Vietnamese Grade 1 Reading Teacher (Standard Northern Accent).
@@ -84,7 +80,6 @@ export const evaluateReading = async (
         }
       ];
     } else {
-      // Text-only fallback
       promptParts = [
         {
           text: `Role: Vietnamese Grade 1 Reading Teacher.
@@ -95,10 +90,10 @@ export const evaluateReading = async (
       ];
     }
 
-    // PRIMARY ATTEMPT: Gemini 1.5 Flash (Explicit Version)
+    // PRIMARY ATTEMPT: Gemini 1.5 Flash (Standard Alias)
     try {
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash-001", // Standardize on 001
+        model: "gemini-1.5-flash", // Use standard alias with new SDK
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: schema as any,
@@ -111,14 +106,13 @@ export const evaluateReading = async (
       return JSON.parse(response.text()) as GeminiFeedbackSchema;
 
     } catch (primaryError: any) {
-      console.warn("Primary Flash-001 Failed, trying Fallback (Pro-001)...", primaryError);
+      console.warn("Primary Flash Failed, trying Fallback (Pro)...", primaryError);
 
-      // FALLBACK ATTEMPT: Gemini 1.5 Pro (Explicit Version)
+      // FALLBACK ATTEMPT: Gemini Pro (Standard Alias)
       const fallbackModel = genAI.getGenerativeModel({
-        model: "gemini-1.5-pro-001",
+        model: "gemini-pro",
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: schema as any,
           temperature: 0.4
         }
       });
@@ -134,7 +128,7 @@ export const evaluateReading = async (
     console.error("Gemini Grading Error (All Models Failed):", error);
     return {
       ...getMockResponse(userSpokenText),
-      teacher_notes: `Error: ${error instanceof Error ? error.message : String(error)}. Both Flash-001 and Pro-001 models failed.`,
+      teacher_notes: `[CODE_VERSION_3.0] Error: ${error instanceof Error ? error.message : String(error)}. Both Flash and Pro models failed.`,
       encouraging_comment: "Có lỗi kết nối nên cô chưa chấm chính xác được. (Chế độ giả lập 0 điểm)"
     };
   }
