@@ -29,6 +29,16 @@ export const getStudents = (): StudentStats[] => {
     }
 };
 
+export const saveStudents = (students: StudentStats[]): void => {
+    try {
+        localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(students));
+        // Dispatch event to notify other components of the change
+        window.dispatchEvent(new Event('students_updated'));
+    } catch (e) {
+        console.error("Failed to save students", e);
+    }
+};
+
 // NEW: Force sync with server (Call this from Dashboard)
 export const syncWithServer = async (classId?: string) => {
     try {
