@@ -357,40 +357,45 @@ export const TeacherDashboard: React.FC = () => {
         return s;
       }
 
-      // Update specific week history
+      // Cập nhật lịch sử của tuần cụ thể đang được chỉnh sửa
       const historyExists = s.history.some(h => h.week === selectedWeek);
       const updatedHistory = historyExists
         ? s.history.map(h =>
           h.week === selectedWeek
             ? {
               ...h,
-              score: Number(editForm.score),
+              score: Number(editForm.score), // Điểm tổng kết
               speed: editForm.speed,
-              readingScore: editForm.readingScore,
+              // Cập nhật các điểm thành phần
+              phonemeScore: editForm.phonemeScore,
               wordScore: editForm.wordScore,
-              sentenceScore: editForm.sentenceScore,
-              exerciseScore: editForm.exerciseScore
+              readingScore: editForm.readingScore, // Sửa từ sentenceScore nếu có
+              exerciseScore: editForm.exerciseScore,
             }
             : h
         )
         : [...s.history, {
           week: selectedWeek,
           score: Number(editForm.score),
-          speed: editForm.speed,
-          readingScore: editForm.readingScore,
+          speed: editForm.speed, // Thêm speed
+          phonemeScore: editForm.phonemeScore,
           wordScore: editForm.wordScore,
-          sentenceScore: editForm.sentenceScore,
-          exerciseScore: editForm.exerciseScore
+          readingScore: editForm.readingScore,
+          exerciseScore: editForm.exerciseScore,
         }];
+
+      // Tính toán lại các chỉ số tổng hợp từ lịch sử đã cập nhật
+      const totalScore = updatedHistory.reduce((acc, h) => acc + (h.score || 0), 0);
+      const newAverageScore = updatedHistory.length > 0 ? Math.round(totalScore / updatedHistory.length) : 0;
 
       return {
         ...s,
         name: editForm.name,
-        completedLessons: Number(editForm.completedLessons),
         history: updatedHistory,
-        // Update top-level stats if it's the latest week
-        averageScore: selectedWeek === 18 ? Number(editForm.score) : s.averageScore,
-        readingSpeed: selectedWeek === 18 ? editForm.speed : s.readingSpeed
+        // Luôn tính toán lại để đảm bảo chính xác
+        completedLessons: updatedHistory.length,
+        averageScore: newAverageScore,
+        readingSpeed: editForm.speed, // Cập nhật tốc độ đọc mới nhất
       };
     });
 

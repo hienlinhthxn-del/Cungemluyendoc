@@ -21,14 +21,23 @@ export default (localStudents, saveDBToCloud) => {
      * @param {object} progressData - An object containing { score, speed, weekNum, audioUrl }.
      * @returns The updated student object.
      */
-    const updateStudentProgress = (student, { score, speed, weekNum, audioUrl }) => {
+    const updateStudentProgress = (student, { score, speed, weekNum, phonemeScore, wordScore, readingScore, exerciseScore }) => {
         const historyIndex = student.history.findIndex(h => h.week === weekNum);
+
+        const progressUpdate = {
+            score,
+            speed,
+            phonemeScore,
+            wordScore,
+            readingScore,
+            exerciseScore
+        };
+
         if (historyIndex >= 0) {
-            student.history[historyIndex].score = score;
-            student.history[historyIndex].speed = speed;
-            if (audioUrl) student.history[historyIndex].audioUrl = audioUrl;
+            // Hợp nhất điểm mới với dữ liệu cũ (ví dụ: các URL audio đã có)
+            Object.assign(student.history[historyIndex], progressUpdate);
         } else {
-            student.history.push({ week: weekNum, score, speed, audioUrl });
+            student.history.push({ week: weekNum, ...progressUpdate });
         }
 
         const totalScore = student.history.reduce((acc, h) => acc + h.score, 0);
@@ -107,7 +116,11 @@ export default (localStudents, saveDBToCloud) => {
             score: req.body.score,
             speed: req.body.speed,
             weekNum: Number(req.body.week) || 0,
-            audioUrl: req.body.audioUrl
+            // Lấy các điểm thành phần
+            phonemeScore: req.body.phonemeScore,
+            wordScore: req.body.wordScore,
+            readingScore: req.body.readingScore,
+            exerciseScore: req.body.exerciseScore,
         };
 
         if (mongoose.connection.readyState === 1) {

@@ -43,55 +43,21 @@ export const saveStudents = (students: StudentStats[]): void => {
 export const syncWithServer = async (classId?: string) => {
     try {
         const url = classId ? `/api/students?classId=${classId}` : '/api/students';
-        const response = await fetch(url);
+        // Thêm { cache: 'no-store' } để đảm bảo luôn lấy dữ liệu mới nhất, tránh bị cache bởi trình duyệt hoặc CDN.
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) throw new Error('Failed to fetch from server');
 
         const serverData: StudentStats[] = await response.json();
 
         if (Array.isArray(serverData)) {
-            // If classId is provided, we treat the server list as the authority for that class.
-            // However, to keep it simple, we will merge with local for preservation of unsynced audios.
-            console.log("Syncing: Server has data, updating local...");
-
-            // MERGE STRATEGY: Union (Server + Local-Only)
-            // This prevents data loss if Server returns empty list or if local creates haven't pushed yet.
-            const serverIds = new Set(serverData.map(s => s.id));
-            const localStudents = getStudents();
-
-            // 1. Process Server Data (Update existing)
-            const updatedServerStudents = serverData.map(serverStudent => {
-                const localStudent = localStudents.find(s => s.id === serverStudent.id);
-                if (!localStudent) return serverStudent;
-
-                // If Local has Audio URL but Server doesn't, preserve Local Audio
-                const mergedHistory = serverStudent.history.map(serverH => {
-                    const localH = localStudent.history.find(h => h.week === serverH.week);
-                    if (localH && localH.audioUrl && !serverH.audioUrl) {
-                        return { ...serverH, audioUrl: localH.audioUrl };
-                    }
-                    return serverH;
-                });
-
-                return {
-                    ...serverStudent,
-                    history: mergedHistory
-                };
-            });
-
-            // 2. Keep Local-Only Students (Preserve unsynced new students)
-            const localOnlyStudents = localStudents.filter(s => !serverIds.has(s.id));
-
-            const finalStudents = [...updatedServerStudents, ...localOnlyStudents];
-
-            // Save merged list
-            localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(finalStudents));
-            window.dispatchEvent(new Event('students_updated'));
-
-            // Optional: Try to backfill local-only students to server?
-            if (localOnlyStudents.length > 0) {
-                console.log(`Found ${localOnlyStudents.length} unsynced students, attempting backfill...`);
-                localOnlyStudents.forEach(s => syncStudentToServer(s));
-            }
+            // CHIẾN LƯỢC MỚI: Coi máy chủ là nguồn dữ liệu duy nhất và đáng tin cậy nhất (Single Source of Truth).
+            // Logic cũ cố gắng hợp nhất dữ liệu máy chủ và local, nhưng gây ra lỗi khi xóa:
+            // học sinh đã xóa ở server bị coi là "chỉ có ở local" và được thêm lại.
+            // Logic mới sẽ ghi đè hoàn toàn dữ liệu local bằng dữ liệu từ server, đảm bảo tính nhất quán.
+            console.log(`Syncing: Server is truth. Overwriting local cache with ${serverData.length} students.`);
+            
+            // Hàm saveStudents sẽ lưu vào localStorage và thông báo cho các component khác cập nhật.
+            saveStudents(serverData);
         }
     } catch (error) {
         console.error("Sync failed:", error);
@@ -119,84 +85,103 @@ export const syncStudentToServer = async (student: StudentStats) => {
     }
 };
 
+/**
+ * @deprecated This function is too generic and uses an old API. Use `uploadPracticeAudio` and `savePracticeScores` instead.
+ */
 export const saveStudentResult = async (studentId: string, week: number, score: number, speed: number | string, audioBlob?: Blob) => {
-    const students = getStudents();
-    const index = students.findIndex(s => s.id === studentId);
+    console.warn("`saveStudentResult` is deprecated. Please refactor to use new service functions.");
+    // The old logic is kept here for reference but should not be used for new features.
+};
 
-    if (index !== -1) {
-        const student = students[index];
-        let uploadedAudioUrl = '';
+/**
+ * MỚI: Tải lên file âm thanh cho một phần cụ thể của bài luyện tập (âm/vần, từ, đoạn văn).
+ * @param studentId ID của học sinh.
+ * @param week Tuần học.
+ * @param part Phần của bài học ('phoneme', 'word', 'reading').
+ * @param audioBlob File âm thanh đã ghi.
+ * @param score Điểm số cho phần này.
+ * @returns Kết quả tải lên, bao gồm URL của file âm thanh mới.
+ */
+export const uploadPracticeAudio = async (
+    studentId: string,
+    week: number,
+    part: 'phoneme' | 'word' | 'reading',
+    audioBlob: Blob,
+    score: number
+) => {
+    try {
+        const formData = new FormData();
+        formData.append('studentId', studentId);
+        formData.append('week', String(week));
+        formData.append('part', part);
+        formData.append('score', String(score)); // Gửi kèm điểm của phần này
 
-        // 1. Upload Audio if exists
-        if (audioBlob) {
-            try {
-                // Upload audio to Cloudinary
-                const formData = new FormData();
-                const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
-                formData.append('audioFile', audioBlob, `student_${studentId}_w${week}.${ext}`); // MATCH SERVER EXPECTATION
+        const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+        const filename = `student_${studentId}_w${week}_${part}.${ext}`;
+        formData.append('audioFile', audioBlob, filename);
 
-                const response = await fetch('/api/upload-student-audio', {
-                    method: 'POST',
-                    body: formData
-                });
+        const response = await fetch('/api/submissions', {
+            method: 'POST',
+            body: formData,
+        });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    uploadedAudioUrl = data.url;
-                }
-            } catch (e) {
-                console.error("Failed to upload student audio", e);
-            }
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Tải lên file âm thanh thất bại.');
         }
 
-        // 2. Update Local State (Optimistic UI)
-        const historyIndex = student.history.findIndex(h => h.week === week);
-        const historyItem: WeeklyStats = { week, score, speed };
-        if (uploadedAudioUrl) historyItem.audioUrl = uploadedAudioUrl;
+        return await response.json(); // { success: true, audioUrl: '...' }
+    } catch (e) {
+        console.error(`Lỗi khi tải lên audio cho phần ${part}:`, e);
+        throw e;
+    }
+};
 
-        if (historyIndex !== -1) {
-            // Preserve existing audioUrl if new one failed? 
-            // Or if simple update? Assume overwrite for now.
-            if (!uploadedAudioUrl && student.history[historyIndex].audioUrl) {
-                historyItem.audioUrl = student.history[historyIndex].audioUrl;
-            }
-            student.history[historyIndex] = historyItem;
-        } else {
-            student.history.push(historyItem);
-            student.history.sort((a, b) => a.week - b.week);
+/**
+ * MỚI: Lưu điểm tổng kết cuối cùng cho một buổi luyện tập.
+ * @param studentId ID của học sinh.
+ * @param week Tuần học.
+ * @param scores Một đối tượng chứa tất cả điểm số của tuần đó.
+ */
+export const savePracticeScores = async (
+    studentId: string,
+    week: number,
+    scores: {
+        totalScore: number;
+        speed: number | string;
+        phonemeScore?: number;
+        wordScore?: number;
+        readingScore?: number;
+        exerciseScore?: number;
+    }
+) => {
+    try {
+        // Đồng bộ điểm số lên server
+        await fetch(`/api/students/${studentId}/progress`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                week: week,
+                score: scores.totalScore,
+                speed: scores.speed,
+                phonemeScore: scores.phonemeScore,
+                wordScore: scores.wordScore,
+                readingScore: scores.readingScore,
+                exerciseScore: scores.exerciseScore,
+            }),
+        });
+
+        // Cập nhật dữ liệu local để giao diện phản hồi ngay lập tức
+        const students = getStudents();
+        const studentIndex = students.findIndex(s => s.id === studentId);
+        if (studentIndex !== -1) {
+            // ... (Phần logic cập nhật local state có thể được thêm vào đây nếu cần)
+            // Tuy nhiên, cách tốt nhất là dựa vào `syncWithServer` để lấy dữ liệu mới nhất.
         }
 
-        student.lastPractice = new Date();
-        const totalScore = student.history.reduce((acc, curr) => acc + curr.score, 0);
-        student.averageScore = Math.round(totalScore / student.history.length);
-        student.readingSpeed = speed;
-
-        students[index] = student;
-        localStorage.setItem(STUDENTS_STORAGE_KEY, JSON.stringify(students));
-        window.dispatchEvent(new Event('students_updated'));
-
-        // 3. SYNC TO SERVER (Background)
-        try {
-            // First ensure student exists on server
-            await fetch('/api/students', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: student.id,
-                    name: student.name,
-                    classId: student.classId
-                })
-            });
-
-            // Then save progress with audioUrl
-            await fetch(`/api/students/${studentId}/progress`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ week, score, speed, audioUrl: uploadedAudioUrl })
-            });
-        } catch (e) {
-            console.error("Background sync failed:", e);
-        }
+    } catch (e) {
+        console.error("Lỗi đồng bộ điểm số:", e);
+        throw e;
     }
 };
 

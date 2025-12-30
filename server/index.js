@@ -19,7 +19,9 @@ import classRoutes from './classRoutes.js';
 // These should be at the top to catch errors early.
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ UNHANDLED REJECTION:', reason);
-  // Application specific logging, throwing an error, or other logic here
+  // Crash the process. This is safer than continuing in an unknown state.
+  // It will make Render show the error in the logs instead of hanging.
+  process.exit(1);
 });
 
 process.on('uncaughtException', (error) => {
@@ -159,6 +161,8 @@ const connectDB = async () => {
         }
     } catch (error) {
         console.error("❌ Lỗi kết nối MongoDB ban đầu:", error);
+        // Re-throw the error to ensure the startup process knows about the failure.
+        throw error;
     }
 };
 
@@ -327,7 +331,7 @@ app.use('/api/classes', classRoutes(localClasses, saveClassesToCloud));
 
 // Route để học sinh nộp bài
 app.post('/api/submissions', uploadMiddleware, async (req, res) => {
-    const { studentId, week, part } = req.body;
+    const { studentId, week, part, score } = req.body; // Thêm 'score'
     const audioFile = req.file;
 
     if (!studentId || !week || !part || !audioFile) {
@@ -348,6 +352,7 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
 
     const useMongo = mongoose.connection.readyState === 1;
     const audioUrlKey = `${part}AudioUrl`;
+    const scoreKey = `${part}Score`;
 
     try {
         if (useMongo) {
@@ -356,9 +361,10 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
 
             let historyRecord = student.history.find(h => h.week === Number(week));
             if (historyRecord) {
-                historyRecord[audioUrlKey] = audioUrl;
+                historyRecord[audioUrlKey] = audioUrl; // Cập nhật audio
+                if (score !== undefined) historyRecord[scoreKey] = Number(score); // Cập nhật điểm
             } else {
-                student.history.push({ week: Number(week), score: 0, speed: 0, [audioUrlKey]: audioUrl });
+                student.history.push({ week: Number(week), score: 0, speed: 0, [audioUrlKey]: audioUrl, [scoreKey]: Number(score) });
             }
             await student.save();
         } else {
@@ -368,9 +374,10 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
             const student = localStudents[studentIndex];
             let historyRecord = student.history.find(h => h.week === Number(week));
             if (historyRecord) {
-                historyRecord[audioUrlKey] = audioUrl;
+                historyRecord[audioUrlKey] = audioUrl; // Cập nhật audio
+                if (score !== undefined) historyRecord[scoreKey] = Number(score); // Cập nhật điểm
             } else {
-                student.history.push({ week: Number(week), score: 0, speed: 0, [audioUrlKey]: audioUrl });
+                student.history.push({ week: Number(week), score: 0, speed: 0, [audioUrlKey]: audioUrl, [scoreKey]: Number(score) });
             }
             saveDBToCloud();
         }
@@ -704,26 +711,31 @@ if (fs.existsSync(distPath)) { // This will be true in production (due to the ch
 }
 
 
-// WRAP STARTUP IN ASYNC TO WAIT FOR DB/DATA LOAD
-const startServer = async () => {
-    try {
-        console.log("⏳ Initializing Data Connection...");
-        await connectDB();
+const startServer = () => {
+    // Bắt đầu lắng nghe các yêu cầu HTTP ngay lập tức.
+    // Điều này cho phép các health check của Render thành công ngay cả khi kết nối DB bị chậm.
+    const server = app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 SERVER PROCESS IS UP and listening on port ${PORT}`);
+        console.log(`👉 Local: http://localhost:${PORT}`);
 
-        const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 FULL SERVER running on port ${PORT}`);
-            console.log(`👉 Local: http://localhost:${PORT}`);
+        // Bây giờ, kết nối với cơ sở dữ liệu trong nền.
+        // Máy chủ đã chạy và có thể phục vụ các yêu cầu cơ bản.
+        console.log("⏳ Initializing Data Connection in the background...");
+        connectDB().catch(err => {
+            console.error("Lỗi kết nối DB trong nền sau khi máy chủ khởi động:", err);
+            // Tùy thuộc vào yêu cầu, bạn có thể muốn xử lý lỗi này
+            // hoặc thậm chí tắt máy chủ nếu DB là tối quan trọng.
         });
-        
-        server.on('error', (e) => {
-            console.error("Server Error:", e);
-        });
-    } catch (err) {
-        console.error("Start Server Error:", err);
-    }
+    });
+
+    server.on('error', (e) => {
+        console.error("Lỗi Máy chủ:", e);
+        // Ví dụ: nếu cổng đã được sử dụng.
+        process.exit(1);
+    });
 };
 
-startServer().catch(err => console.error("Unhandled Startup Error:", err));
+startServer();
 
 process.on('exit', (code) => console.log(`Process exiting with code: ${code}`));
 process.on('SIGINT', () => { console.log('SIGINT received'); process.exit(); });
