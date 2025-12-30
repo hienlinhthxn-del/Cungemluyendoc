@@ -111,42 +111,48 @@ export default (localStudents, saveDBToCloud) => {
 
     // UPDATE Progress (After Lesson)
     router.post('/:id/progress', async (req, res) => {
-        const { id } = req.params;
-        const progressData = {
-            score: req.body.score,
-            speed: req.body.speed,
-            weekNum: Number(req.body.week) || 0,
-            // Lấy các điểm thành phần
-            phonemeScore: req.body.phonemeScore,
-            wordScore: req.body.wordScore,
-            readingScore: req.body.readingScore,
-            exerciseScore: req.body.exerciseScore,
-        };
+        try {
+            const { id } = req.params;
+            const progressData = {
+                score: req.body.score,
+                speed: req.body.speed,
+                weekNum: Number(req.body.week) || 0,
+                // Lấy các điểm thành phần
+                phonemeScore: req.body.phonemeScore,
+                wordScore: req.body.wordScore,
+                readingScore: req.body.readingScore,
+                exerciseScore: req.body.exerciseScore,
+            };
 
-        if (mongoose.connection.readyState === 1) {
-            let student = await Student.findOne({ id });
-            if (!student) {
-                console.log(`⚠️ Auto-creating temporary student record for ID: ${id} (MongoDB Mode)`);
-                student = new Student({ id: id, name: "Học sinh " + id, history: [] });
+            if (mongoose.connection.readyState === 1) {
+                let student = await Student.findOne({ id });
+                if (!student) {
+                    console.log(`⚠️ Auto-creating temporary student record for ID: ${id} (MongoDB Mode)`);
+                    student = new Student({ id: id, name: "Học sinh " + id, history: [] });
+                }
+                student = updateStudentProgress(student, progressData);
+                await student.save();
+                return res.json(student);
             }
-            student = updateStudentProgress(student, progressData);
-            await student.save();
-            return res.json(student);
+
+            // Fallback: Update Local Data
+            let idx = localStudents.findIndex(s => s.id === id);
+
+            if (idx === -1) {
+                console.log(`⚠️ Auto-creating temporary student record for ID: ${id} (Local Mode)`);
+                const newStudent = { id: id, name: "Học sinh " + id, classId: 'DEFAULT', completedLessons: 0, averageScore: 0, history: [], lastPractice: new Date() };
+                localStudents.push(newStudent);
+                idx = localStudents.length - 1;
+            }
+
+            localStudents[idx] = updateStudentProgress(localStudents[idx], progressData);
+            saveDBToCloud(); // Sync
+            res.json(localStudents[idx]);
+
+        } catch (error) {
+            console.error(`❌ Lỗi khi cập nhật tiến độ cho học sinh ${req.params.id}:`, error);
+            res.status(500).json({ error: 'Không thể cập nhật tiến độ học sinh.', details: error.message });
         }
-
-        // Fallback: Update Local Data
-        let idx = localStudents.findIndex(s => s.id === id);
-
-        if (idx === -1) {
-            console.log(`⚠️ Auto-creating temporary student record for ID: ${id} (Local Mode)`);
-            const newStudent = { id: id, name: "Học sinh " + id, classId: 'DEFAULT', completedLessons: 0, averageScore: 0, history: [], lastPractice: new Date() };
-            localStudents.push(newStudent);
-            idx = localStudents.length - 1;
-        }
-
-        localStudents[idx] = updateStudentProgress(localStudents[idx], progressData);
-        saveDBToCloud(); // Sync
-        res.json(localStudents[idx]);
     });
 
     // DELETE Student

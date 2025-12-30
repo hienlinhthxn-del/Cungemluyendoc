@@ -329,14 +329,16 @@ const App: React.FC = () => {
   return (
     <Router>
       <Layout role={role} onLogout={handleLogout}>
-        <Routes>
-          <Route path="/" element={<Navigate to={getDefaultRoute()} replace />} />
+        <ErrorBoundary fallbackMessage="Đã có lỗi nghiêm trọng xảy ra trong ứng dụng. Vui lòng thử tải lại trang.">
+          <Routes>
+            <Route path="/" element={<Navigate to={getDefaultRoute()} replace />} />
 
-          {renderRoutesByRole()}
+            {renderRoutesByRole()}
 
-          {/* Fallback: Redirect to user's default route if they try to access a wrong page */}
-          <Route path="*" element={<Navigate to={getDefaultRoute()} replace />} />
-        </Routes>
+            {/* Fallback: Redirect to user's default route if they try to access a wrong page */}
+            <Route path="*" element={<Navigate to={getDefaultRoute()} replace />} />
+          </Routes>
+        </ErrorBoundary>
       </Layout>
     </Router>
   );
