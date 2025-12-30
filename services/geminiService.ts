@@ -9,11 +9,11 @@ const getMockResponse = (spoken: string, errorMsg: string): GeminiFeedbackSchema
   score: 0,
   mispronounced_words: ["Lỗi", "Kết", "Nối", "API"],
   encouraging_comment: "Hệ thống chưa kết nối được với AI chấm điểm. Vui lòng kiểm tra API Key.",
-  teacher_notes: `[CODE_VERSION_6.0_AUTO] Error: ${errorMsg}. Switched to Mock mode.`,
+  teacher_notes: `[CODE_VERSION_7.0_FINAL] Error: ${errorMsg}. Switched to Mock mode.`,
   spoken_text: spoken || "Không nghe thấy gì...",
 });
 
-// 1. DYNAMIC DISCOVERY: Ask Google what models are allowed
+// 1. DYNAMIC DISCOVERY
 const fetchAvailableModels = async (apiKey: string): Promise<string[]> => {
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -29,30 +29,34 @@ const fetchAvailableModels = async (apiKey: string): Promise<string[]> => {
   }
 };
 
-// 2. SELECT BEST MODEL
+// 2. SELECT BEST MODEL - FIXED PRIORITY
 const selectBestModel = (availableModels: string[]): string => {
-  // Priority list
+  // STRICT Priority list - ONLY Modern 1.5 Models
   const priorities = [
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-002',
+    'gemini-1.5-flash',      // Primary Goal
     'gemini-1.5-flash-001',
-    'gemini-1.5-flash-8b',
-    'gemini-1.5-pro',
-    'gemini-pro',
-    'gemini-1.0-pro'
+    'gemini-1.5-flash-002',
+    'gemini-1.5-flash-8b',   // Lightweight Backup
+    'gemini-1.5-pro',        // Premium Backup
+    'gemini-1.5-pro-001',
+    'gemini-1.5-pro-002'
   ];
 
-  // Logic: Find the first priority that exists in availableModels
+  // Logic: Scan priorities and pick first one present in the available list
   for (const preferred of priorities) {
-    if (availableModels.some(m => m === preferred || m.includes(preferred))) {
-      // Return the EXACT string from the API list if possible, or the preferred match
-      const exactMatch = availableModels.find(m => m === preferred);
-      return exactMatch || preferred;
+    if (availableModels.includes(preferred)) {
+      return preferred;
     }
   }
 
-  // Fallback if list is empty or matches nothing (Blind Guess)
-  return 'gemini-1.5-flash';
+  // Double Check: Try partial match (e.g. key has 'gemini-1.5-flash-latest' but list is strict)
+  const flashMatch = availableModels.find(m => m.includes('1.5-flash'));
+  if (flashMatch) return flashMatch;
+
+  // Last Resort: Just return the first available model that is NOT 'gemini-pro' (because gemini-pro is broken)
+  const safeFallback = availableModels.find(m => !m.includes('gemini-pro') && !m.includes('1.0'));
+
+  return safeFallback || 'gemini-1.5-flash';
 };
 
 // Raw REST API Call Function
@@ -86,16 +90,16 @@ export const evaluateReading = async (
   }
 
   // STEP 1: Discover Models
-  let selectedModel = 'gemini-1.5-flash'; // Default guess
-  let discoveryNote = "Skipped/Failed";
+  let selectedModel = 'gemini-1.5-flash';
+  let discoveryNote = "Skipped";
 
   try {
     const available = await fetchAvailableModels(apiKey);
     if (available.length > 0) {
       selectedModel = selectBestModel(available);
-      discoveryNote = `Auto-Selected: ${selectedModel} from [${available.length} available]`;
+      discoveryNote = `Auto-Selected: ${selectedModel} from [${available.length} models]`;
     } else {
-      discoveryNote = "ListModels empty/failed -> Using Fallback Guess";
+      discoveryNote = "ListModels empty/failed -> Defaulting";
     }
   } catch (e) {
     console.warn("Discovery error", e);
