@@ -9,12 +9,12 @@ const getMockResponse = (spoken: string, errorMsg: string): GeminiFeedbackSchema
   score: 0,
   mispronounced_words: ["Lỗi", "Kết", "Nối", "API"],
   encouraging_comment: "Hệ thống chưa kết nối được với AI chấm điểm. Vui lòng kiểm tra API Key.",
-  teacher_notes: `[CODE_VERSION_7.0_FINAL] Error: ${errorMsg}. Switched to Mock mode.`,
+  teacher_notes: `[CODE_VERSION_8.0_SMART] ${errorMsg}`,
   spoken_text: spoken || "Không nghe thấy gì...",
 });
 
-// 1. DYNAMIC DISCOVERY
-const fetchAvailableModels = async (apiKey: string): Promise<string[]> => {
+// 1. DYNAMIC DISCOVERY: Get models AND Check Capabilities
+const fetchValidModels = async (apiKey: string): Promise<string[]> => {
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
     if (!response.ok) return [];
@@ -22,41 +22,46 @@ const fetchAvailableModels = async (apiKey: string): Promise<string[]> => {
     const data = await response.json();
     if (!data.models) return [];
 
-    return data.models.map((m: any) => m.name.replace('models/', ''));
+    // FILTER: Only models that can 'generateContent'
+    const validModels = data.models.filter((m: any) =>
+      m.supportedGenerationMethods &&
+      m.supportedGenerationMethods.includes("generateContent")
+    );
+
+    return validModels.map((m: any) => m.name.replace('models/', ''));
   } catch (e) {
     console.warn("ListModels failed", e);
     return [];
   }
 };
 
-// 2. SELECT BEST MODEL - FIXED PRIORITY
-const selectBestModel = (availableModels: string[]): string => {
-  // STRICT Priority list - ONLY Modern 1.5 Models
+// 2. SELECT BEST MODEL
+const selectBestModel = (validModels: string[]): string => {
+  // STRICT Priority list
   const priorities = [
-    'gemini-1.5-flash',      // Primary Goal
+    'gemini-1.5-flash',
     'gemini-1.5-flash-001',
-    'gemini-1.5-flash-002',
-    'gemini-1.5-flash-8b',   // Lightweight Backup
-    'gemini-1.5-pro',        // Premium Backup
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
     'gemini-1.5-pro-001',
-    'gemini-1.5-pro-002'
+    'gemini-1.0-pro-001' // Older but reliable fallback
   ];
 
-  // Logic: Scan priorities and pick first one present in the available list
   for (const preferred of priorities) {
-    if (availableModels.includes(preferred)) {
+    if (validModels.includes(preferred)) {
       return preferred;
     }
   }
 
-  // Double Check: Try partial match (e.g. key has 'gemini-1.5-flash-latest' but list is strict)
-  const flashMatch = availableModels.find(m => m.includes('1.5-flash'));
-  if (flashMatch) return flashMatch;
+  // Fallback: Pick the newest looking model from the valid list
+  const anyFlash = validModels.find(m => m.includes('flash'));
+  if (anyFlash) return anyFlash;
 
-  // Last Resort: Just return the first available model that is NOT 'gemini-pro' (because gemini-pro is broken)
-  const safeFallback = availableModels.find(m => !m.includes('gemini-pro') && !m.includes('1.0'));
+  const anyPro = validModels.find(m => m.includes('pro') && !m.includes('vision')); // avoid vision-only if any
+  if (anyPro) return anyPro;
 
-  return safeFallback || 'gemini-1.5-flash';
+  // Last resort: The first valid text generation model
+  return validModels[0] || 'gemini-1.5-flash';
 };
 
 // Raw REST API Call Function
@@ -71,7 +76,7 @@ const callGeminiRaw = async (model: string, payload: any, apiKey: string) => {
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`API Error ${response.status} on model ${model}: ${errorBody}`);
+    throw new Error(`API Error ${response.status} on ${model}: ${errorBody}`);
   }
 
   return response.json();
@@ -89,20 +94,25 @@ export const evaluateReading = async (
     return new Promise((resolve) => setTimeout(() => resolve(getMockResponse(userSpokenText, "Missing API Key")), 1500));
   }
 
-  // STEP 1: Discover Models
+  // STEP 1: Discover Valid Models
   let selectedModel = 'gemini-1.5-flash';
-  let discoveryNote = "Skipped";
+  let discoveryLog = "";
 
   try {
-    const available = await fetchAvailableModels(apiKey);
-    if (available.length > 0) {
-      selectedModel = selectBestModel(available);
-      discoveryNote = `Auto-Selected: ${selectedModel} from [${available.length} models]`;
+    const validModels = await fetchValidModels(apiKey);
+
+    // Debug: List top 3 valid models to see what we have
+    const top3 = validModels.slice(0, 3).join(", ");
+    discoveryLog = `Found ${validModels.length} Valid Models: [${top3}...]`;
+
+    if (validModels.length > 0) {
+      selectedModel = selectBestModel(validModels);
+      discoveryLog += ` -> Selected: ${selectedModel}`;
     } else {
-      discoveryNote = "ListModels empty/failed -> Defaulting";
+      discoveryLog += " -> No valid models found, defaulting.";
     }
   } catch (e) {
-    console.warn("Discovery error", e);
+    discoveryLog = "Discovery Failed";
   }
 
   // STEP 2: Construct Payload
@@ -150,7 +160,6 @@ export const evaluateReading = async (
   };
 
   try {
-    // ATTEMPT EXECUTION
     const data = await callGeminiRaw(selectedModel, payload, apiKey);
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
@@ -158,14 +167,13 @@ export const evaluateReading = async (
 
     const result = JSON.parse(text) as GeminiFeedbackSchema;
 
-    // Append debug info
     return {
       ...result,
-      teacher_notes: `${result.teacher_notes} | [DEBUG: ${discoveryNote}]`
+      teacher_notes: `${result.teacher_notes} | [DEBUG: ${discoveryLog}]`
     };
 
   } catch (error) {
     console.error("REST Grading Error:", error);
-    return getMockResponse(userSpokenText, `${error instanceof Error ? error.message : String(error)} | Discovery: ${discoveryNote}`);
+    return getMockResponse(userSpokenText, `${error instanceof Error ? error.message : String(error)} | ${discoveryLog}`);
   }
 };
