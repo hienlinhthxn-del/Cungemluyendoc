@@ -65,18 +65,23 @@ export const syncWithServer = async (classId?: string) => {
         const serverData: StudentStats[] = await response.json();
 
         if (Array.isArray(serverData)) {
-            if (serverData.length > 0) {
-                console.log(`Đồng bộ thành công: Tải về ${serverData.length} học sinh.`);
-                saveStudents(serverData);
-            } else if (classId && classId !== 'ALL') {
-                // If specific class requested but empty, we SHOULD respect that it might be empty
-                console.warn(`Lớp ${classId} hiện chưa có học sinh trên server.`);
-                saveStudents([]);
+            const localStudents = getStudents();
+
+            if (classId && classId !== 'ALL') {
+                // SMART MERGE: Replace only students belonging to the synced class
+                // This prevents wiping out other classes that might be in the local cache
+                const otherClassesStudents = localStudents.filter(s => s.classId !== classId);
+                const mergedData = cleanupAndDedupe([...otherClassesStudents, ...serverData]);
+
+                saveStudents(mergedData);
+                console.log(`[SYNC] Smart Merge: Updated Class ${classId} (${serverData.length} students). Total local: ${mergedData.length}`);
             } else {
-                // If global fetch it empty, be cautious
-                const localStudents = getStudents();
-                if (localStudents.length > 0) {
-                    console.warn("Server trả về danh sách rỗng cho toàn bộ tài khoản. Giữ lại dữ liệu local để an toàn.");
+                // GLOBAL SYNC (Teacher ALL or Initial Load)
+                if (serverData.length > 0) {
+                    console.log(`[SYNC] Global Replace: Downloaded ${serverData.length} students.`);
+                    saveStudents(serverData);
+                } else if (localStudents.length > 0) {
+                    console.warn("[SYNC] Server returned empty global list. Preserving local data for safety.");
                 } else {
                     saveStudents([]);
                 }
