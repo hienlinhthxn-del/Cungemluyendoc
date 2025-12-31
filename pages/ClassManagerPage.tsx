@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Trash2, Users, ChevronLeft, X, UserPlus, Search, Upload, Download } from 'lucide-react';
+import { Plus, Trash2, Users, ChevronLeft, X, UserPlus, Search, Upload, Download, Edit, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { playClick, playSuccess, playError } from '../services/audioService';
 import { getStudents, saveStudents, syncWithServer } from '../services/studentService';
@@ -10,6 +10,59 @@ interface ClassGroup {
   id: string;
   name: string;
 }
+
+const StudentListItem = ({ student, index, onDelete, onRename }: any) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(student.name);
+
+  const handleSave = () => {
+    onRename(student, editName);
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group hover:border-blue-200 transition-colors">
+      <div className="flex items-center gap-3 flex-1">
+        <span className="font-mono text-gray-400 w-6 text-sm">#{index + 1}</span>
+        {isEditing ? (
+          <div className="flex items-center gap-2 flex-1 mr-4">
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="flex-1 px-2 py-1 rounded border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            />
+            <button onClick={handleSave} className="text-green-600 hover:bg-green-100 p-1 rounded">
+              <Check className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <span className="font-bold text-gray-700">{student.name}</span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+        {!isEditing && (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="text-gray-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Đổi tên"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+        )}
+        <button
+          onClick={() => onDelete(student.id, student.name)}
+          className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+          title="Xóa học sinh"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export const ClassManagerPage: React.FC = () => {
   const navigate = useNavigate();
@@ -177,6 +230,54 @@ export const ClassManagerPage: React.FC = () => {
     }
 
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDeleteStudentFromClass = async (studentId: string, studentName: string) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa học sinh "${studentName}" không?`)) return;
+
+    try {
+      await fetch(`/api/students/${studentId}`, { method: 'DELETE' });
+
+      // Update local state
+      const updatedStudents = allStudents.filter(s => s.id !== studentId);
+      setAllStudents(updatedStudents);
+      saveStudents(updatedStudents);
+
+      // Update current view
+      setCurrentStudents(currentStudents.filter(s => s.id !== studentId));
+
+      // Notify others
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      playSuccess();
+    } catch (e) {
+      alert("Lỗi khi xóa học sinh");
+    }
+  };
+
+  const handleRenameStudent = async (student: StudentStats, newName: string) => {
+    if (!newName.trim() || newName === student.name) return;
+
+    const updatedStudent = { ...student, name: newName };
+
+    // Update server
+    try {
+      await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedStudent)
+      });
+
+      // Update local
+      const updatedList = allStudents.map(s => s.id === student.id ? updatedStudent : s);
+      setAllStudents(updatedList);
+      saveStudents(updatedList);
+      setCurrentStudents(currentStudents.map(s => s.id === student.id ? updatedStudent : s));
+
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      playSuccess();
+    } catch (e) {
+      alert("Lỗi đổi tên");
+    }
   };
 
   // Tính toán sĩ số một cách linh hoạt và chính xác bằng useMemo
@@ -374,10 +475,13 @@ export const ClassManagerPage: React.FC = () => {
                   </div>
                 ) : (
                   currentStudents.map((s, idx) => (
-                    <div key={s.id || idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-                      <span className="font-bold text-gray-700">{idx + 1}. {s.name}</span>
-                      <span className="text-xs text-gray-400 bg-white px-2 py-1 rounded border">ID: {s.id}</span>
-                    </div>
+                    <StudentListItem
+                      key={s.id || idx}
+                      student={s}
+                      index={idx}
+                      onDelete={handleDeleteStudentFromClass}
+                      onRename={handleRenameStudent}
+                    />
                   ))
                 )}
               </div>
