@@ -1,0 +1,446 @@
+export const DEFAULT_LESSONS = [
+    {
+        id: 'w1',
+        week: 1,
+        title: 'Tuần 1: a, b, c, e, ê',
+        description: 'Làm quen với các chữ cái đầu tiên.',
+        phonemes: ['a', 'b', 'c', 'e', 'ê'],
+        vocabulary: ['ba ba', 'bè cá', 'bế bé', 'bà bế bé'],
+        readingText: [
+            'Bà bế bé.',
+            'A, ba ba, bề bề.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Chữ nào là chữ "a"?',
+                options: ['b', 'a', 'c'],
+                correctAnswer: 'a'
+            }
+        ]
+    },
+    {
+        id: 'w2',
+        week: 2,
+        title: 'Tuần 2: o, ô, ơ, d, đ',
+        description: 'Chữ cái và dấu thanh.',
+        phonemes: ['o', 'ô', 'ơ', 'd', 'đ'],
+        vocabulary: ['bờ đê', 'đỗ đỏ', 'đổ đá', 'cá cờ', 'da dê', 'dỗ bé', 'đá dế', 'bó cỏ'],
+        readingText: [
+            'Bờ đê có dế.',
+            'Bà bế bé, bé bá cổ bà.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Bờ đê có con gì?',
+                options: ['con dế', 'con cá', 'con gà'],
+                correctAnswer: 'con dế'
+            },
+            {
+                id: 'q2',
+                question: 'Bé làm gì với bà?',
+                options: ['đi chơi', 'bá cổ', 'ngủ'],
+                correctAnswer: 'bá cổ'
+            }
+        ]
+    },
+    {
+        id: 'w3',
+        week: 3,
+        title: 'Tuần 3: i, k, h, l, u, ư, ch, kh',
+        description: 'Phụ âm và nguyên âm mới.',
+        phonemes: ['i', 'k', 'h', 'l', 'u', 'ư', 'ch', 'kh'],
+        vocabulary: ['bí đỏ', 'kì lạ', 'lá hẹ', 'bờ hồ', 'ê ke', 'cô chú', 'che chở', 'lá khô', 'chú khỉ'],
+        readingText: [
+            'Bà cho bé chú chó.',
+            'Chị Hà là chị cả.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Bà cho bé con gì?',
+                options: ['chú khỉ', 'chú chó', 'con gà'],
+                correctAnswer: 'chú chó'
+            },
+            {
+                id: 'q2',
+                question: 'Chị Hà là gì?',
+                options: ['chị hai', 'chị cả', 'em út'],
+                correctAnswer: 'chị cả'
+            }
+        ]
+    },
+    {
+        id: 'w4',
+        week: 4,
+        title: 'Tuần 4: m, n, g, gi, gh, nh, ng, ngh',
+        description: 'Luyện tập ghép vần.',
+        phonemes: ['m', 'n', 'g', 'gi', 'gh', 'nh', 'ng', 'ngh'],
+        vocabulary: ['bố mẹ', 'ca nô', 'gà gô', 'cụ già', 'ghế gỗ', 'nhà kho', 'ghi nhớ', 'ghế đá', 'ngã ba', 'cá ngừ', 'nghỉ hè', 'đề nghị', 'nghé ọ', 'củ nghệ', 'nghĩ kĩ'],
+        readingText: [
+            'Nhà bà có củ nghệ, có cả gà gô.',
+            'Nghỉ hè, bố cho cả nhà Hà đi hồ Ba Bể.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Nhà bà có củ gì?',
+                options: ['củ từ', 'củ nghệ', 'củ khoai'],
+                correctAnswer: 'củ nghệ'
+            },
+            {
+                id: 'q2',
+                question: 'Nghỉ hè cả nhà đi đâu?',
+                options: ['hồ Ba Bể', 'về quê', 'ra phố'],
+                correctAnswer: 'hồ Ba Bể'
+            }
+        ]
+    },
+    {
+        id: 'w5',
+        week: 5,
+        title: 'Tuần 5: r, s, t, tr, th, ia, ua, ưa',
+        description: 'Các phụ âm ghép và vần ia, ua, ưa.',
+        phonemes: ['r', 's', 't', 'tr', 'th', 'ia', 'ua', 'ưa'],
+        vocabulary: ['rổ rá', 'su su', 'cá rô', 'sư tử', 'củ từ', 'lá tre', 'thơ ca', 'chú thỏ', 'nhà trẻ', 'cá thu', 'lá mía', 'đĩa sứ', 'sữa chua'],
+        readingText: [
+            'Bữa trưa nhà Hà có cua bể, sữa chua.',
+            'Mẹ đi chợ mua đồ cho cả nhà, mẹ mua cho hà dứa to mía là của dì Nga, hà bổ dứa đưa cho bà cho bố.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Bữa trưa nhà Hà có món gì?',
+                options: ['cá kho', 'cua bể', 'thịt gà'],
+                correctAnswer: 'cua bể'
+            },
+            {
+                id: 'q2',
+                question: 'Mẹ mua quả gì cho Hà?',
+                options: ['quả dừa', 'quả dứa', 'quả dưa'],
+                correctAnswer: 'quả dứa'
+            }
+        ]
+    },
+    {
+        id: 'w6',
+        week: 6,
+        title: 'Tuần 6: ph, qu, v, x, y',
+        description: 'Phụ âm ph, qu, v, x, y.',
+        phonemes: ['ph', 'qu', 'v', 'x', 'y'],
+        vocabulary: ['cà phê', 'tổ phó', 'phở gà', 'quà quê', 'xe cộ', 'xổ số', 'y sĩ', 'vở vẽ'],
+        readingText: [
+            'Chú Phú đi ra thủ đô.',
+            'Hè về, bố chở Phú về quê ở nhà bà. Bà cho Phú đi chợ mua đủ thứ quà quê: giò, chả, giá đỗ. Phú mua cả vỏ quế về cho bố ở phố cổ.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Bố chở Phú đi đâu?',
+                options: ['Đi thủ đô', 'Về quê', 'Đi học'],
+                correctAnswer: 'Về quê'
+            },
+            {
+                id: 'q2',
+                question: 'Từ nào chứa âm "ph"?',
+                options: ['xe cộ', 'cà phê', 'y sĩ'],
+                correctAnswer: 'cà phê'
+            }
+        ]
+    },
+    {
+        id: 'w7',
+        week: 7,
+        title: 'Tuần 7: an, ăn, ân, on, ôn, ơn...',
+        description: 'Vần an, ăn, ân, on, ôn, ơn, en, ên, in, un, am, ăm, âm.',
+        phonemes: ['an', 'ăn', 'ân', 'on', 'ôn', 'ơn', 'en', 'ên', 'in', 'un', 'am', 'ăm', 'âm'],
+        vocabulary: ['bàn ghế', 'khăn rằn', 'ân cần', 'cần mẫn', 'lon ton', 'khôn lớn', 'số bốn', 'đèn pin', 'ngon nến', 'bản tin', 'con giun', 'quả cam', 'chăm làm', 'đầm sen', 'chăm chỉ', 'nằm ngủ'],
+        readingText: [
+            'Bé Vân và bé An là bạn thân.',
+            'Bé lon ton ra ngõ đón bà ở quê lên.',
+            'Dì Trâm ân cần đưa mía cho Lan ăn.',
+            'Bé Nam bị đau chân, hôm nay bà đưa Nam đi khám ở trạm y tế xã.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Bé Vân và bé An là gì của nhau?',
+                options: ['Chị em', 'Bạn thân', 'Hàng xóm'],
+                correctAnswer: 'Bạn thân'
+            }
+        ]
+    },
+    {
+        id: 'w8',
+        week: 8,
+        title: 'Tuần 8: om, ôm, ơm, em, êm...',
+        description: 'Vần om, ôm, ơm, em, êm, im, um, ai, ay, ây, oi, ôi, ơi.',
+        phonemes: ['om', 'ôm', 'ơm', 'em', 'êm', 'im', 'um', 'ai', 'ay', 'ây', 'oi', 'ôi', 'ơi'],
+        vocabulary: ['đom đóm', 'chôm chôm', 'thợ gốm', 'chả nem', 'êm đềm', 'xem phim', 'tôm hùm', 'cảm cúm', 'trại hè', 'máy bay', 'thầy cô', 'giỏ mây', 'gói quà', 'nồi xôi', 'thổi còi', 'bơi lội'],
+        readingText: [
+            'Quê Thơm có nghề làm gốm và làm nấm rơm.',
+            'Nhà bà Tâm có tủ gỗ lim.',
+            'Em cần cẩn thận khi làm bài.',
+            'Trưa hè oi ả, chị Mai và Trâm nô đùa ở bãi cỏ, bố mẹ gọi hai chị em về ngủ trưa.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Quê Thơm có nghề gì?',
+                options: ['Làm gốm', 'Dệt vải', 'Trồng lúa'],
+                correctAnswer: 'Làm gốm'
+            }
+        ]
+    },
+    {
+        id: 'w9',
+        week: 9,
+        title: 'Tuần 9: ui, ưi, ao, eo, au...',
+        description: 'Vần ui, ưi, ao, eo, au, âu, êu, iu, ưu.',
+        phonemes: ['ui', 'ưi', 'ao', 'eo', 'au', 'âu', 'êu', 'iu', 'ưu'],
+        vocabulary: ['leo núi', 'ao bèo', 'leo trèo', 'táo mèo', 'dưa hấu', 'bầu trời', 'lều trại', 'níu kéo', 'mưu mẹo', 'quả vải', 'chào cờ', 'sưu tầm'],
+        readingText: [
+            'Trâu ơi, ta bảo trâu này.',
+            'Trâu ăn no cỏ, trâu cày với ta.',
+            'Nhà bà nội Thảo có cây táo, cây lựu sai trĩu quả. Chim bồ câu, chim sẻ bay tới líu lo cả ngày.',
+            'Bố em là bộ đội ở đảo xa hôm nay mẹ đưa em đi gửi thư cho bố. Em kể với bố là em chăm làm, bố sẽ vui lắm.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Bài ca dao nói về con gì?',
+                options: ['Con trâu', 'Con bò', 'Con ngựa'],
+                correctAnswer: 'Con trâu'
+            }
+        ]
+    },
+    {
+        id: 'w10',
+        week: 10,
+        title: 'Tuần 10: ac, ăc, âc, oc, ôc...',
+        description: 'Vần ac, ăc, âc, oc, ôc, uc, ưc, at, ăt, ât, ot, ôt, ơt.',
+        phonemes: ['ac', 'ăc', 'âc', 'oc', 'ôc', 'uc', 'ưc', 'at', 'ăt', 'ât', 'ot', 'ôt', 'ơt'],
+        vocabulary: ['nhạc sĩ', 'màu sắc', 'xôi gấc', 'giấc mơ', 'đọc báo', 'học bài', 'gốc cây', 'cơn lốc', 'lọ mực', 'máy xúc', 'thức ăn', 'gỗ mục', 'hát ca', 'gặt lúa', 'lật đật', 'bật lửa', 'quả nhót', 'cà rốt', 'cột cờ', 'cái thớt'],
+        readingText: [
+            'Hôm nay Hà dậy sớm vì có các cô giáo đến dự giờ. Hà chải tóc và mặc áo mới.',
+            'Đến giờ học, Hà giơ tay xin trả lời câu hỏi. Thấy Hà nói nhỏ, cô giáo nhắc Hà nói to và tự tin hơn.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Từ nào chứa vần "ac"?',
+                options: ['màu sắc', 'nhạc sĩ', 'giấc mơ'],
+                correctAnswer: 'nhạc sĩ'
+            },
+            {
+                id: 'q2',
+                question: 'Hà dậy sớm để làm gì?',
+                options: ['Đi chơi', 'Dự giờ', 'Ngủ tiếp'],
+                correctAnswer: 'Dự giờ'
+            }
+        ]
+    },
+    {
+        id: 'w11',
+        week: 11,
+        title: 'Tuần 11: et, êt, it, ut, ưt...',
+        description: 'Vần et, êt, it, ut, ưt, ap, ăp, âp, op, ôp, ơp.',
+        phonemes: ['et', 'êt', 'it', 'ut', 'ưt', 'ap', 'ăp', 'âp', 'op', 'ôp', 'ơp'],
+        vocabulary: ['con vẹt', 'kết bạn', 'đất sét', 'cháo vịt', 'mứt tết', 'bút chì', 'màu sáp', 'bắp ngô', 'tấp nập', 'ngập lụt', 'họp lớp', 'lốp xe', 'tia chớp', 'bứt phá', 'gạo lứt', 'lộp độp'],
+        readingText: [
+            'Tia chớp vụt lóe trên bầu trời báo cơn mưa sắp bắt đầu.',
+            'Bố mẹ cho em đi chợ tết. Chợ thật tấp nập trên các sạp đồ đầy ắp rau thịt, củ quả. Em chọn một hộp mứt sen để đến lớp chia cho các bạn.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Bố mẹ cho em đi đâu?',
+                options: ['Đi học', 'Đi chợ tết', 'Đi bơi'],
+                correctAnswer: 'Đi chợ tết'
+            }
+        ]
+    },
+    {
+        id: 'w12',
+        week: 12,
+        title: 'Tuần 12: ep, êp, ip, up, anh...',
+        description: 'Vần ep, êp, ip, up, anh, ênh, inh, ach, êch, ich, ang, ăng, âng.',
+        phonemes: ['ep', 'êp', 'ip', 'up', 'anh', 'ênh', 'inh', 'ach', 'êch', 'ich', 'ang', 'ăng', 'âng'],
+        vocabulary: ['đôi dép', 'con tép', 'gạo nếp', 'xếp hàng', 'bắt nhịp', 'túp lều', 'giúp đỡ', 'cành cây', 'nhanh nhẹn', 'học sinh', 'que tính', 'con kênh', 'sách vở', 'khách mời', 'cổ tích', 'tĩnh mịch', 'cây bàng', 'bằng lăng', 'vầng trăng', 'nhà tầng'],
+        readingText: [
+            'Vừa ngớt mưa rào',
+            'Nhảy ra bì bõm',
+            'Ếch kêu "ộp ộp"',
+            'Thấy bác đi câu',
+            'Rủ nhau trốn mau',
+            'Ếch kêu "ộp ộp"',
+            'Ếch kêu "ộp ộp"'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Con ếch kêu như thế nào?',
+                options: ['gâu gâu', 'ộp ộp', 'meo meo'],
+                correctAnswer: 'ộp ộp'
+            }
+        ]
+    },
+    {
+        id: 'w13',
+        week: 13,
+        title: 'Tuần 13: ong, ông, ung, ưng...',
+        description: 'Vần ong, ông, ung, ưng, iêc, iêp, iên, yên, iêng, iêm, iêt, iêu, yêu.',
+        phonemes: ['ong', 'ông', 'ung', 'ưng', 'iêc', 'iêp', 'iên', 'yên', 'iêng', 'iêm', 'iêt', 'iêu', 'yêu'],
+        vocabulary: ['dòng sông', 'bông hồng', 'trung thu', 'khu rừng', 'xanh biếc', 'kiến lửa', 'bữa tiệc', 'nhiếp ảnh', 'viên phấn', 'yên lặng', 'bay liệng', 'niềm vui', 'viết bài', 'hiểu biết', 'yêu mến', 'biết ơn'],
+        readingText: [
+            'Cánh diều no gió',
+            'Sáo nó thổi vang',
+            'Sao trời trôi ngang',
+            'Diều thành trăng vàng',
+            'Tiếng nó chơi vơi',
+            'Diều là hạt cau',
+            'Phơi trên nong trời'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Cánh diều như thế nào?',
+                options: ['no gió', 'đói bụng', 'buồn ngủ'],
+                correctAnswer: 'no gió'
+            }
+        ]
+    },
+    {
+        id: 'w14',
+        week: 14,
+        title: 'Tuần 14: uôi, ươi, ươu, uôm...',
+        description: 'Vần uôi, ươi, ươu, uôm, uôc, uôt, uôn, uông.',
+        phonemes: ['uôi', 'ươi', 'ươu', 'uôm', 'uôc', 'uôt', 'uôn', 'uông'],
+        vocabulary: ['tuổi thơ', 'cá đuối', 'đười ươi', 'hươu sao', 'cánh buồm', 'cuộc thi', 'trong suốt', 'uống thuốc', 'chuồn chuồn', 'hình vuông', 'khuôn khổ', 'mong muốn', 'nụ cười', 'lò sưởi', 'con khướu', 'bướu cổ'],
+        readingText: [
+            'Thỏ con ngồi im lặng',
+            'Lông một màu trắng muốt',
+            'Hai mắt hồng trong suốt',
+            'Trông hiền ơi là hiền',
+            'Tặng bạn một nụ cười',
+            'Là niềm vui nho nhỏ',
+            'Tặng bạn một chút gió',
+            'Là hương thơm đầu mùa'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Lông thỏ màu gì?',
+                options: ['trắng muốt', 'đen thui', 'vàng óng'],
+                correctAnswer: 'trắng muốt'
+            }
+        ]
+    },
+    {
+        id: 'w15',
+        week: 15,
+        title: 'Tuần 15: ươc, ươt, ươm, ươp...',
+        description: 'Vần ươc, ươt, ươm, ươp, ươn, ương, oa, oe.',
+        phonemes: ['ươc', 'ươt', 'ươm', 'ươp', 'ươn', 'ương', 'oa', 'oe'],
+        vocabulary: ['thước kẻ', 'uống nước', 'mượt mà', 'trượt băng', 'quả mướp', 'con bướm', 'hồ gươm', 'sườn đồi', 'vườn cây', 'bay lượn', 'hương thơm', 'quê hương', 'chìa khóa', 'sức khỏe', 'áo hoa', 'xòe ô', 'chích chòe', 'khỏe mạnh', 'hoa loa kèn'],
+        readingText: [
+            'Đèn khoe đèn tỏ hơn trăng,',
+            'Đèn ra trước gió còn chăng hỡi đèn',
+            'Trăng khoe trăng tỏ hơn đèn',
+            'Cớ sao trăng phải chịu luồn đám mây'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Cái gì khoe tỏ hơn trăng?',
+                options: ['Đèn', 'Sao', 'Mây'],
+                correctAnswer: 'Đèn'
+            }
+        ]
+    },
+    {
+        id: 'w16',
+        week: 16,
+        title: 'Tuần 16: oan, oăn, oat, oăt...',
+        description: 'Vần oan, oăn, oat, oăt, oai, uê, uy, uân, uât, uyên, uyêt.',
+        phonemes: ['oan', 'oăn', 'oat', 'oăt', 'oai', 'uê', 'uy', 'uân', 'uât', 'uyên', 'uyêt'],
+        vocabulary: ['soạn bài', 'ngoan ngoãn', 'thoăn thoắt', 'thanh thoát', 'thoải mái', 'bánh khoai', 'hoa huệ', 'xum xuê', 'thùy mị', 'quần đảo', 'huân chương', 'luyện tập', 'chuyên cần', 'cương quyết', 'nhiệt huyết'],
+        readingText: [
+            'Chiếc tổ vành khuyên nhỏ xíu nằm thỏm giữa hai chiếc lá bưởi. Vành khuyên mẹ đã cẩn thận khâu hai chiếc lá lại rồi tha rác về đan tổ bên trong. Đêm đêm, mấy anh em vành khuyên nằm gối đầu lên nhau, mơ một ngày khôn lớn sải cánh bay ra trời rộng.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Tổ chim vành khuyên nằm ở đâu?',
+                options: ['Trên cành cây', 'Giữa hai chiếc lá bưởi', 'Trong hốc đá'],
+                correctAnswer: 'Giữa hai chiếc lá bưởi'
+            },
+            {
+                id: 'q2',
+                question: 'Anh em vành khuyên mơ ước điều gì?',
+                options: ['Được ăn no', 'Sải cánh bay ra trời rộng', 'Xây tổ mới'],
+                correctAnswer: 'Sải cánh bay ra trời rộng'
+            }
+        ]
+    },
+    {
+        id: 'w17',
+        week: 17,
+        title: 'Tuần 17: Ôn tập',
+        description: 'Ôn tập các vần đã học qua bài đồng dao.',
+        phonemes: ['Ôn tập'],
+        vocabulary: [],
+        readingText: [
+            'Con cá mà có cái đuôi',
+            'Hai vây ve vẩy, nó bơi rất tài',
+            'Con rùa mà có cái mai',
+            'Cái cổ thụt ngắn, thụt dài vào ra',
+            'Con voi mà có hai ngà',
+            'Cái vòi nó cuốn, đổ nhà đổ cây',
+            'Con chim mà có cánh bay',
+            'Bay cùng nam, bắc, đông, tây tỏ tường'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Con gì có hai vây ve vẩy?',
+                options: ['Con rùa', 'Con cá', 'Con voi'],
+                correctAnswer: 'Con cá'
+            },
+            {
+                id: 'q2',
+                question: 'Con voi dùng cái gì để cuốn đổ nhà đổ cây?',
+                options: ['Hai ngà', 'Cái vòi', 'Chân'],
+                correctAnswer: 'Cái vòi'
+            }
+        ]
+    },
+    {
+        id: 'w18',
+        week: 18,
+        title: 'Tuần 18: Ôn tập',
+        description: 'Ôn tập cuối kỳ 1.',
+        phonemes: ['Ôn tập'],
+        vocabulary: [],
+        readingText: [
+            'Sau cơn mưa',
+            'Sau trận mưa rào, mọi vật đều sáng và tươi. Những đoá râm bụt thêm đỏ chói. Bầu trời xanh bóng như vừa được giội rửa. Mấy đám mây bông trôi nhởn nhơ, sáng rực lên trong ánh mặt trời.',
+            'Mẹ gà mừng rỡ “tục, tục” dắt bầy con quây quanh vũng nước đọng trong vườn. Những tán lá mùng xanh nõn nà. Trên lá còn đọng vài giọt mưa rung rinh như hạt ngọc.'
+        ],
+        questions: [
+            {
+                id: 'q1',
+                question: 'Sau trận mưa rào, mọi vật trông như thế nào?',
+                options: ['Khô héo và buồn bã', 'Sáng và tươi', 'Không có gì thay đổi'],
+                correctAnswer: 'Sáng và tươi'
+            },
+            {
+                id: 'q2',
+                question: 'Mẹ gà dắt bầy con đi đâu?',
+                options: ['Đi ngủ', 'Quanh vũng nước đọng', 'Đi tìm giun'],
+                correctAnswer: 'Quanh vũng nước đọng'
+            }
+        ]
+    }
+];
