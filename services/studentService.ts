@@ -50,8 +50,15 @@ export const saveStudents = (students: StudentStats[]): void => {
 export const syncWithServer = async (classId?: string) => {
     try {
         const url = classId ? `/api/students?classId=${classId}` : '/api/students';
+        const token = localStorage.getItem('token');
+        const headers: any = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         // Thêm { cache: 'no-store' } để đảm bảo luôn lấy dữ liệu mới nhất, tránh bị cache bởi trình duyệt hoặc CDN.
-        const response = await fetch(url, { cache: 'no-store' });
+        const response = await fetch(url, {
+            headers,
+            cache: 'no-store'
+        });
         if (!response.ok) throw new Error('Failed to fetch from server');
 
         const serverData: StudentStats[] = await response.json();
@@ -82,9 +89,13 @@ export const syncWithServer = async (classId?: string) => {
 
 export const syncStudentToServer = async (student: StudentStats) => {
     try {
+        const token = localStorage.getItem('token');
+        const headers: any = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         await fetch('/api/students', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
                 id: student.id,
                 name: student.name,

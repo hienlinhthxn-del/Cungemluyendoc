@@ -6,7 +6,11 @@ let cachedLessons: Lesson[] = [];
 // Fetch lessons from server, fallback to constants if empty or offline
 export const getLessons = async (): Promise<Lesson[]> => {
     try {
-        const res = await fetch('/api/lessons');
+        const token = localStorage.getItem('token');
+        const headers: any = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch('/api/lessons', { headers });
         if (res.ok) {
             const data = await res.json();
             if (data && data.length > 0) {
@@ -23,9 +27,13 @@ export const getLessons = async (): Promise<Lesson[]> => {
 
 export const saveLesson = async (lesson: Lesson): Promise<boolean> => {
     try {
+        const token = localStorage.getItem('token');
+        const headers: any = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch('/api/lessons', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify(lesson)
         });
         return res.ok;
@@ -37,7 +45,14 @@ export const saveLesson = async (lesson: Lesson): Promise<boolean> => {
 
 export const deleteLesson = async (id: string): Promise<boolean> => {
     try {
-        const res = await fetch(`/api/lessons/${id}`, { method: 'DELETE' });
+        const token = localStorage.getItem('token');
+        const headers: any = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/lessons/${id}`, {
+            method: 'DELETE',
+            headers
+        });
         return res.ok;
     } catch (e) {
         console.error("Delete lesson failed", e);

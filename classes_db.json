@@ -1,0 +1,30 @@
+[
+  {
+    "id": "c1767171870876",
+    "name": "1A4",
+    "teacherName": "Giáo viên",
+    "teacherId": "local_1767168801053",
+    "createdAt": "2025-12-31T09:04:30.880Z"
+  },
+  {
+    "id": "c1767171314529",
+    "name": "1A3",
+    "teacherName": "Giáo viên",
+    "teacherId": "local_1767171069065",
+    "createdAt": "2025-12-31T08:55:14.534Z"
+  },
+  {
+    "id": "ClassB_1767170575788",
+    "name": "Lớp 1B",
+    "teacherName": "Giáo viên",
+    "teacherId": "local_1767170575470",
+    "createdAt": "2025-12-31T08:42:55.786Z"
+  },
+  {
+    "id": "ClassA_1767170575777",
+    "name": "Lớp 1A",
+    "teacherName": "Giáo viên",
+    "teacherId": "local_1767170575308",
+    "createdAt": "2025-12-31T08:42:55.778Z"
+  }
+]

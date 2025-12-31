@@ -1,0 +1,694 @@
+[
+  {
+    "id": "s1767171524317499",
+    "name": "Hà Tâm An",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317319",
+    "name": "Vũ Ngọc Khánh An",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317490",
+    "name": "Hoàng Diệu Anh",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317480",
+    "name": "Quàng Tuấn Anh",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317566",
+    "name": "Lê Bảo Châu",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317513",
+    "name": "Trịnh Công Dũng",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317852",
+    "name": "Bùi Nhật Duy",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317258",
+    "name": "Nguyễn Nhật Duy",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317154",
+    "name": "Nguyễn Phạm Linh Đan",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s176717152431772",
+    "name": "Nguyễn Ngọc Bảo Hân",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317404",
+    "name": "Mào Trung Hiếu",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317372",
+    "name": "Nguyễn Bá Gia Hưng",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317840",
+    "name": "Vừ Gia Hưng",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317412",
+    "name": "Vừ Thị Ngọc Linh",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317523",
+    "name": "Đỗ Phan Duy Long",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317384",
+    "name": "Vừ Thành Long",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317155",
+    "name": "Vừ Bảo Ly",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317579",
+    "name": "Quàng Thị Quốc Mai",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [
+      {
+        "week": 15,
+        "score": 0,
+        "speed": 0,
+        "phonemeAudioUrl": "/uploads/audioFile-1767173158021-404239357.webm",
+        "phonemeScore": 0
+      }
+    ],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317274",
+    "name": "Vừ Công Minh",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317825",
+    "name": "Phạm Bảo Ngọc",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317513",
+    "name": "Lò Thảo Nguyên",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317741",
+    "name": "Trình Chân Nguyên",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s176717152431782",
+    "name": "Lò Đức Phong",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317182",
+    "name": "Thào Thị Thảo",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317787",
+    "name": "Tạ Anh Thư",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317396",
+    "name": "Lò Minh Tiến",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317262",
+    "name": "Chang Trí Tuệ",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [
+      {
+        "week": 15,
+        "score": 0,
+        "speed": 0,
+        "phonemeAudioUrl": "C:\\Users\\Ad\\Desktop\\c-ng-em-luy-n-c\\server\\uploads\\audioFile-1767172580037-980662773.webm",
+        "phonemeScore": 0
+      }
+    ],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317589",
+    "name": "Cà Phương Uyên",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171524317322",
+    "name": "Bùi Uyển Vy",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T08:58:44.317Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171813944",
+    "name": "Lò Thảo Nguyên",
+    "classId": "c1767171314529",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:03:33.948Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608973",
+    "name": "Trương Đình Phúc An",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608166",
+    "name": "Đoàn Trâm Anh",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608685",
+    "name": "Mùa Diệu Anh",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [
+      {
+        "week": 15,
+        "score": 0,
+        "speed": 0,
+        "phonemeAudioUrl": "C:\\Users\\Ad\\Desktop\\c-ng-em-luy-n-c\\server\\uploads\\audioFile-1767172677190-479224039.webm",
+        "phonemeScore": 0
+      }
+    ],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608141",
+    "name": "Lò Huyền Anh",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608770",
+    "name": "Điêu Trúc Anh",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608292",
+    "name": "Mào Thanh Bình",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608924",
+    "name": "Thào Mạnh Cường",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608432",
+    "name": "Nguyễn Vũ Tuệ Chi",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [
+      {
+        "week": 15,
+        "score": 0,
+        "speed": 0,
+        "phonemeAudioUrl": "/uploads/audioFile-1767173096381-537273346.webm",
+        "phonemeScore": 0
+      }
+    ],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608457",
+    "name": "Phạm Đức Dũng",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608334",
+    "name": "Bùi Trung Dũng",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608105",
+    "name": "Lê Đức Duy",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608675",
+    "name": "Giàng Khánh Duy",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608967",
+    "name": "Phàng Nhật Giới",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608882",
+    "name": "Nguyễn Ngọc Hoa",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608145",
+    "name": "Lờ Mẩy Hoa",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608707",
+    "name": "Vàng Phúc Hưng",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608438",
+    "name": "Giàng Minh Khang",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608213",
+    "name": "Nguyễn Ngọc Lan",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608383",
+    "name": "Hoàng Khánh Linh",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608247",
+    "name": "Thào Thị Bảo Ngọc",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608804",
+    "name": "Lò Ánh Nguyệt",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608117",
+    "name": "Vũ Ngọc Tuệ Nhi",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608488",
+    "name": "Trần Phú Quang",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608158",
+    "name": "Ngô Thanh Quân",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608455",
+    "name": "Mùa A Sơn",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s176717187860832",
+    "name": "Nguyễn Thanh Tùng",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608950",
+    "name": "Trần Thanh Tùng",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608134",
+    "name": "Phạm Minh Thư",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608452",
+    "name": "Quàng Nhã Uyên",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  },
+  {
+    "id": "s1767171878608115",
+    "name": "lếch",
+    "classId": "c1767171870876",
+    "completedLessons": 0,
+    "averageScore": 0,
+    "readingSpeed": 0,
+    "history": [],
+    "lastPractice": "2025-12-31T09:04:38.608Z",
+    "badges": []
+  }
+]

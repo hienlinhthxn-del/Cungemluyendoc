@@ -5,6 +5,7 @@ import { playClick, playSuccess, playError } from '../services/audioService';
 import { getStudents, saveStudents, syncWithServer } from '../services/studentService';
 import { StudentStats } from '../types';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../context/AuthContext';
 
 interface ClassGroup {
   id: string;
@@ -66,81 +67,105 @@ const StudentListItem = ({ student, index, onDelete, onRename }: any) => {
 
 export const ClassManagerPage: React.FC = () => {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newClassName, setNewClassName] = useState('');
-  // Khởi tạo state rỗng để an toàn cho SSR. Dữ liệu sẽ được tải trong useEffect.
   const [allStudents, setAllStudents] = useState<StudentStats[]>([]);
 
-  // State quản lý học sinh trong lớp
   const [selectedClass, setSelectedClass] = useState<ClassGroup | null>(null);
   const [studentName, setStudentName] = useState('');
   const [currentStudents, setCurrentStudents] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Lắng nghe sự kiện cập nhật học sinh từ các trang khác để đồng bộ giao diện
   useEffect(() => {
-    // Tải dữ liệu học sinh ban đầu một cách an toàn ở phía client
-    setAllStudents(getStudents());
+    fetchClasses();
+    fetchAllStudents();
+  }, [token]);
 
-    const handleStudentsUpdate = () => {
-      setAllStudents(getStudents());
-    };
-    window.addEventListener('students_updated', handleStudentsUpdate);
-    return () => window.removeEventListener('students_updated', handleStudentsUpdate);
-  }, []);
+  const fetchClasses = async () => {
+    try {
+      const headers: any = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  useEffect(() => {
-    // Tải danh sách lớp từ localStorage
-    const savedClasses = localStorage.getItem('classes');
-    if (savedClasses) {
-      try {
-        // Bỏ qua studentCount cũ nếu có, vì ta sẽ tính lại một cách chính xác
-        const parsedClasses = JSON.parse(savedClasses).map(({ id, name }: any) => ({ id, name }));
-        if (Array.isArray(parsedClasses)) {
-          setClasses(parsedClasses);
-        }
-      } catch (e) {
-        console.error("Lỗi parse JSON từ localStorage cho 'classes':", e);
+      const res = await fetch('/api/classes', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setClasses(data);
+        localStorage.setItem('classes', JSON.stringify(data));
       }
-    } else {
-      // Dữ liệu mẫu nếu chưa có
-      setClasses([
-        { id: '1', name: 'Lớp 1A' },
-        { id: '2', name: 'Lớp 1B' },
-      ]);
+    } catch (e) {
+      console.error("Failed to fetch classes", e);
     }
-  }, []);
+  };
+
+  const fetchAllStudents = async () => {
+    try {
+      const headers: any = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Fetch students (this will return only students for this teacher if backend filters correctly)
+      const res = await fetch('/api/students', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setAllStudents(data);
+        saveStudents(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch students", e);
+    }
+  };
+
+  const handleAddClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClassName.trim()) return;
+
+    try {
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/classes', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          id: `c${Date.now()}`,
+          name: newClassName,
+          teacherName: 'Giáo viên'
+        })
+      });
+
+      if (res.ok) {
+        const newClass = await res.json();
+        setClasses([...classes, newClass]);
+        localStorage.setItem('classes', JSON.stringify([...classes, newClass]));
+        setNewClassName('');
+        setIsModalOpen(false);
+        playSuccess();
+      } else {
+        alert("Lỗi khi tạo lớp");
+      }
+    } catch (e) {
+      alert("Lỗi kết nối");
+    }
+  };
+
+  const handleDeleteClass = (id: string) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa lớp này không?')) {
+      // TODO: Implement delete API call if available
+      // For now just local + refresh
+      saveClasses(classes.filter(c => c.id !== id));
+    }
+  };
 
   const saveClasses = (newClasses: ClassGroup[]) => {
     setClasses(newClasses);
     localStorage.setItem('classes', JSON.stringify(newClasses));
   };
 
-  const handleAddClass = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newClassName.trim()) return;
-
-    const newClass: ClassGroup = {
-      id: Date.now().toString(),
-      name: newClassName,
-    };
-
-    saveClasses([...classes, newClass]);
-    setNewClassName('');
-    setIsModalOpen(false);
-  };
-
-  const handleDeleteClass = (id: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa lớp này không?')) {
-      saveClasses(classes.filter(c => c.id !== id));
-    }
-  };
 
   // --- LOGIC QUẢN LÝ HỌC SINH ---
   const openClassDetails = (cls: ClassGroup) => {
     setSelectedClass(cls);
-    // Lọc ra học sinh của lớp này
     const classStudents = allStudents.filter((s: any) => s.classId === cls.id);
     setCurrentStudents(classStudents);
   };
@@ -149,7 +174,6 @@ export const ClassManagerPage: React.FC = () => {
     e.preventDefault();
     if (!studentName.trim() || !selectedClass) return;
 
-    // Tạo học sinh mới đúng cấu trúc
     const newStudent: StudentStats = {
       id: `s${Date.now()}`,
       name: studentName,
@@ -162,31 +186,29 @@ export const ClassManagerPage: React.FC = () => {
       badges: []
     };
 
-    // 1. Cập nhật danh sách tổng và lưu vào localStorage (thông qua service)
-    const updatedAllStudents = [...allStudents, newStudent];
-    saveStudents(updatedAllStudents);
-
-    // Thông báo cho các component khác biết để cập nhật
-    window.dispatchEvent(new CustomEvent('students_updated'));
-
-    // 2. Cập nhật UI hiện tại
-    setAllStudents(updatedAllStudents);
-    setCurrentStudents([...currentStudents, newStudent]);
-    setStudentName('');
-
-    // 3. Đồng bộ học sinh mới lên server
     try {
-      await fetch('/api/students', {
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/students', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(newStudent)
       });
+
+      if (res.ok) {
+        const savedStudent = await res.json();
+        const updatedAllStudents = [...allStudents, savedStudent];
+        setAllStudents(updatedAllStudents);
+        saveStudents(updatedAllStudents);
+        setCurrentStudents([...currentStudents, savedStudent]);
+        setStudentName('');
+        playSuccess();
+        window.dispatchEvent(new CustomEvent('students_updated'));
+      }
     } catch (err) {
       console.error("Failed to sync new student to server", err);
-      // Có thể thêm thông báo lỗi cho người dùng ở đây
     }
-
-    playSuccess();
   };
 
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,8 +225,12 @@ export const ClassManagerPage: React.FC = () => {
     formData.append('classId', selectedClass.id);
 
     try {
+      const headers: any = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/students/import', {
         method: 'POST',
+        headers,
         body: formData,
       });
       const data = await res.json();
@@ -212,14 +238,10 @@ export const ClassManagerPage: React.FC = () => {
       if (data.success) {
         playSuccess();
         alert(data.message);
-
-        // Sync and refresh
-        await syncWithServer(selectedClass.id);
-
-        // Refresh local list logic (re-read from storage after sync might be needed, or just reload page)
-        // For now, we reload the list from the updated storage
-        openClassDetails(selectedClass);
-
+        fetchAllStudents(); // Refresh full list
+        // Re-open/refresh view for this class
+        // Ideally we fetch just for this class, but fetchAll is fine
+        // Wait a bit for state update or manually update local state if returns list
       } else {
         playError();
         alert("Lỗi: " + data.error);
@@ -236,19 +258,22 @@ export const ClassManagerPage: React.FC = () => {
     if (!confirm(`Bạn có chắc chắn muốn xóa học sinh "${studentName}" không?`)) return;
 
     try {
-      await fetch(`/api/students/${studentId}`, { method: 'DELETE' });
+      const headers: any = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      // Update local state
-      const updatedStudents = allStudents.filter(s => s.id !== studentId);
-      setAllStudents(updatedStudents);
-      saveStudents(updatedStudents);
+      const res = await fetch(`/api/students/${studentId}`, {
+        method: 'DELETE',
+        headers
+      });
 
-      // Update current view
-      setCurrentStudents(currentStudents.filter(s => s.id !== studentId));
-
-      // Notify others
-      window.dispatchEvent(new CustomEvent('students_updated'));
-      playSuccess();
+      if (res.ok) {
+        const updatedStudents = allStudents.filter(s => s.id !== studentId);
+        setAllStudents(updatedStudents);
+        saveStudents(updatedStudents);
+        setCurrentStudents(currentStudents.filter(s => s.id !== studentId));
+        window.dispatchEvent(new CustomEvent('students_updated'));
+        playSuccess();
+      }
     } catch (e) {
       alert("Lỗi khi xóa học sinh");
     }
@@ -259,28 +284,29 @@ export const ClassManagerPage: React.FC = () => {
 
     const updatedStudent = { ...student, name: newName };
 
-    // Update server
     try {
-      await fetch('/api/students', {
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/students', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(updatedStudent)
       });
 
-      // Update local
-      const updatedList = allStudents.map(s => s.id === student.id ? updatedStudent : s);
-      setAllStudents(updatedList);
-      saveStudents(updatedList);
-      setCurrentStudents(currentStudents.map(s => s.id === student.id ? updatedStudent : s));
-
-      window.dispatchEvent(new CustomEvent('students_updated'));
-      playSuccess();
+      if (res.ok) {
+        const updatedList = allStudents.map(s => s.id === student.id ? updatedStudent : s);
+        setAllStudents(updatedList);
+        saveStudents(updatedList);
+        setCurrentStudents(currentStudents.map(s => s.id === student.id ? updatedStudent : s));
+        window.dispatchEvent(new CustomEvent('students_updated'));
+        playSuccess();
+      }
     } catch (e) {
       alert("Lỗi đổi tên");
     }
   };
 
-  // Tính toán sĩ số một cách linh hoạt và chính xác bằng useMemo
   const classStudentCounts = useMemo(() => {
     const counts = new Map<string, number>();
     allStudents.forEach(student => {

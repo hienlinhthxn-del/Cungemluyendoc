@@ -34,6 +34,7 @@ import Student from '../Student.js';
 import Lesson from './Lesson.js';
 import ClassModel from './Class.js';
 import Communication from './models/Communication.js';
+import authRoutes from './routes/authRoutes.js';
 
 // Helper to load env manually if not loaded (for local dev)
 if (fs.existsSync('.env')) {
@@ -63,40 +64,56 @@ const PORT = process.env.PORT || 10001;
 // --- 1. DATABASE & PERSISTENCE ---
 
 // In-Memory Database (Synced to Cloudinary)
-let localStudents = [];
-const DB_FILE = 'reading_app_db.json';
-const CLOUD_DB_PUBLIC_ID = 'reading_app_db_backup.json';
+// In-Memory Database (Synced to Cloudinary)
+// Declarations moved to line ~280 to group with persistence logic
+// let localStudents = []; 
+// const DB_FILE = 'reading_app_db.json';
+// const CLOUD_DB_PUBLIC_ID = 'reading_app_db_backup.json';
 
 // --- Generic Helper to Debounce Cloudinary JSON Uploads ---
-const createDebouncedUploader = (publicId, getDataFn, entityName) => {
+// --- Generic Helper to Debounce Cloudinary JSON Uploads & Local Save ---
+const createDebouncedUploader = (publicId, getDataFn, entityName, localFilename) => {
     let timeoutId = null;
     return () => {
         if (timeoutId) clearTimeout(timeoutId);
         timeoutId = setTimeout(async () => {
-            if (!process.env.CLOUDINARY_CLOUD_NAME) return;
+            const data = getDataFn();
+            const jsonString = JSON.stringify(data, null, 2);
 
-            try {
-                console.log(`☁️ Syncing ${entityName} to Cloudinary...`);
-                const data = getDataFn();
-                const jsonString = JSON.stringify(data, null, 2);
-
-                // Use upload_stream to avoid writing a temporary file to disk
-                await new Promise((resolve, reject) => {
-                    const uploadStream = cloudinary.uploader.upload_stream(
-                        { resource_type: 'raw', public_id: publicId, overwrite: true, invalidate: true },
-                        (error, result) => {
-                            if (error) return reject(error);
-                            resolve(result);
-                        }
-                    );
-                    uploadStream.end(jsonString);
-                });
-
-                console.log(`✅ ${entityName} Synced to Cloudinary!`);
-            } catch (e) {
-                console.error(`❌ Failed to sync ${entityName} to Cloud:`, e.message);
+            // 1. SAVE TO LOCAL FILE (Always, as primary or backup)
+            if (localFilename) {
+                try {
+                    const localPath = path.join(__dirname, '..', localFilename);
+                    fs.writeFileSync(localPath, jsonString, 'utf8');
+                    console.log(`💾 Saved ${entityName} to local file: ${localFilename}`);
+                } catch (e) {
+                    console.error(`❌ Failed to save ${entityName} locally:`, e.message);
+                }
             }
-        }, 5000); // Debounce for 5 seconds
+
+            // 2. SYNC TO CLOUDINARY (If Configured)
+            if (process.env.CLOUDINARY_CLOUD_NAME) {
+                try {
+                    console.log(`☁️ Syncing ${entityName} to Cloudinary...`);
+
+                    // Use upload_stream to avoid writing a temporary file to disk
+                    await new Promise((resolve, reject) => {
+                        const uploadStream = cloudinary.uploader.upload_stream(
+                            { resource_type: 'raw', public_id: publicId, overwrite: true, invalidate: true },
+                            (error, result) => {
+                                if (error) return reject(error);
+                                resolve(result);
+                            }
+                        );
+                        uploadStream.end(jsonString);
+                    });
+
+                    console.log(`✅ ${entityName} Synced to Cloudinary!`);
+                } catch (e) {
+                    console.error(`❌ Failed to sync ${entityName} to Cloud:`, e.message);
+                }
+            }
+        }, 2000); // Debounce
     };
 };
 
@@ -264,16 +281,50 @@ const LessonAudioSchema = new mongoose.Schema({
 });
 const LessonAudio = mongoose.model('LessonAudio', LessonAudioSchema);
 
-// In-Memory Classes (Synced to Cloudinary/File)
-let localClasses = [
-    { id: '1A3', name: 'Lớp 1A3', teacherName: 'Cô giáo', createdAt: new Date() }
-];
+// In-Memory Database (Synced to Cloudinary & Local File)
+let localStudents = [];
+const DB_FILE = 'reading_app_db.json'; // Public ID
+const CLOUD_DB_PUBLIC_ID = 'reading_app_db_backup.json';
+const LOCAL_DB_FILENAME = 'students_db.json'; // Local Filename
+
+// In-Memory Classes (Synced to Cloudinary & Local File)
+let localClasses = [];
+
 
 const CLOUD_CLASSES_DB_PUBLIC_ID = 'reading_app_classes_backup.json';
+const LOCAL_CLASSES_FILENAME = 'classes_db.json';
+
+// --- DATA LOADING LOGIC ---
+const loadLocalData = () => {
+    // 1. Students
+    const studentPath = path.join(__dirname, '..', LOCAL_DB_FILENAME);
+    if (fs.existsSync(studentPath)) {
+        try {
+            localStudents = JSON.parse(fs.readFileSync(studentPath, 'utf8'));
+            console.log(`📂 Loaded ${localStudents.length} students from local file.`);
+        } catch (e) {
+            console.error("Error loading local students:", e);
+        }
+    }
+
+    // 2. Classes
+    const classPath = path.join(__dirname, '..', LOCAL_CLASSES_FILENAME);
+    if (fs.existsSync(classPath)) {
+        try {
+            localClasses = JSON.parse(fs.readFileSync(classPath, 'utf8'));
+            console.log(`📂 Loaded ${localClasses.length} classes from local file.`);
+        } catch (e) {
+            console.error("Error loading local classes:", e);
+        }
+    }
+};
+
+// Initial Load
+loadLocalData();
 
 // Create specific uploader instances using the generic helper
-const saveDBToCloud = createDebouncedUploader(CLOUD_DB_PUBLIC_ID, () => localStudents, 'Student Database');
-const saveClassesToCloud = createDebouncedUploader(CLOUD_CLASSES_DB_PUBLIC_ID, () => localClasses, 'Classes Database');
+const saveDBToCloud = createDebouncedUploader(CLOUD_DB_PUBLIC_ID, () => localStudents, 'Student Database', LOCAL_DB_FILENAME);
+const saveClassesToCloud = createDebouncedUploader(CLOUD_CLASSES_DB_PUBLIC_ID, () => localClasses, 'Classes Database', LOCAL_CLASSES_FILENAME);
 
 // Helper: Load Classes from Cloudinary
 const loadClassesFromCloud = async () => {
@@ -324,7 +375,8 @@ const saveAudioMap = (data) => {
 };
 
 // --- 5. API ROUTES ---
-app.use('/api/students', studentRoutes(localStudents, saveDBToCloud));
+app.use('/api/auth', authRoutes);
+app.use('/api/students', studentRoutes(localStudents, saveDBToCloud, localClasses));
 
 app.use('/api/lessons', lessonRoutes);
 
@@ -386,11 +438,14 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
         return res.status(400).json({ error: 'Missing required submission data.' });
     }
 
-    let audioUrl = audioFile.path; // Default for local storage
+    let audioUrl;
     if (audioFile.secure_url) { // Cloudinary gives secure_url
         audioUrl = audioFile.secure_url.startsWith('http:')
             ? audioFile.secure_url.replace('http:', 'https:')
             : audioFile.secure_url;
+    } else {
+        // Local Disk Storage: Use relative path for browser access
+        audioUrl = `/uploads/${audioFile.filename}`;
     }
 
     // --- DEBUGGING STEP: Log the connection state right before use ---
@@ -493,10 +548,15 @@ app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, re
         const { lessonId } = req.params;
         const { text } = req.body;
 
-        // Force HTTPS for Cloudinary
-        let audioUrl = req.file.secure_url || req.file.path;
-        if (audioUrl && audioUrl.startsWith('http:') && audioUrl.includes('cloudinary.com')) {
-            audioUrl = audioUrl.replace('http:', 'https:');
+        // Force HTTPS for Cloudinary or Use Relative Path for Local
+        let audioUrl;
+        if (req.file.secure_url) {
+            audioUrl = req.file.secure_url;
+            if (audioUrl.startsWith('http:') && audioUrl.includes('cloudinary.com')) {
+                audioUrl = audioUrl.replace('http:', 'https:');
+            }
+        } else {
+            audioUrl = `/uploads/${req.file.filename}`;
         }
 
         console.log("✅ Cloudinary URL generated:", audioUrl);
