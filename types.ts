@@ -39,6 +39,9 @@ export interface WeeklyStats {
   score: number;
   speed: string | number; // Words per minute or status
   audioUrl?: string; // Recording URL
+  readingAudioUrl?: string;
+  wordAudioUrl?: string;
+  phonemeAudioUrl?: string;
   readingScore?: number;
   wordScore?: number;
   sentenceScore?: number;

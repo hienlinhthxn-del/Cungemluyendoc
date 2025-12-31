@@ -173,6 +173,12 @@ export const ParentDashboard: React.FC = () => {
     return getGreeting(selectedStudent.name);
   }, [selectedStudent, getGreeting]);
 
+  const playAudioUrl = (url: string) => {
+    playClick();
+    const audio = new Audio(url);
+    audio.play().catch(e => alert("Lỗi phát audio: " + (e.message || "File không tồn tại hoặc lỗi định dạng")));
+  };
+
   const handleSendFeedback = async () => {
     if (!feedbackMessage.trim() || !selectedStudent) return;
 
@@ -339,9 +345,19 @@ export const ParentDashboard: React.FC = () => {
                   <p className="font-bold text-gray-800 text-sm">Kết quả Tuần {record.week}</p>
                   <p className="text-xs text-gray-500">Tốc độ: {record.speed} tiếng/phút</p>
                 </div>
-                <span className={`font-bold text-sm ${record.score >= 80 ? 'text-green-600' : 'text-orange-500'}`}>
-                  {record.score}đ
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className={`font-bold text-sm ${record.score >= 80 ? 'text-green-600' : 'text-orange-500'}`}>
+                    {record.score}đ
+                  </span>
+                  {(record.readingAudioUrl || record.audioUrl) && (
+                    <button
+                      onClick={() => playAudioUrl(record.readingAudioUrl || record.audioUrl || '')}
+                      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-full transition-colors"
+                    >
+                      <PlayCircle className="w-3 h-3" /> Nghe lại
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             {selectedStudent.history.length === 0 && (

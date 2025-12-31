@@ -44,7 +44,7 @@ export const TeacherDashboard: React.FC = () => {
     const validWeeks = allLessons
       .map(l => l.week)
       .filter((w): w is number => typeof w === 'number' && !isNaN(w));
-    return Array.from(new Set(validWeeks)).sort((a, b) => (b || 0) - (a || 0));
+    return Array.from(new Set(validWeeks)).sort((a: number, b: number) => b - a);
   }, [allLessons]);
 
   // Fetch Lessons and Classes on mount
@@ -240,6 +240,14 @@ export const TeacherDashboard: React.FC = () => {
     name: s.name.split(' ').pop(), // Last name
     score: s.currentScore,
   }));
+
+  // Calculate students needing support based on weekData
+  const studentsNeedingSupport = useMemo(() => {
+    return weekData
+      .filter(s => s.currentScore > 0 && s.currentScore < 70)
+      .sort((a, b) => a.currentScore - b.currentScore)
+      .slice(0, 5);
+  }, [weekData]);
 
   // --- Class Management Logic ---
   const handleCreateClass = async () => {
@@ -531,10 +539,11 @@ export const TeacherDashboard: React.FC = () => {
     setUploadingStudentId(null);
   };
 
-  const playAudioUrl = (url: string) => {
+  const playAudioUrl = (url?: string) => {
+    if (!url) return;
     playClick();
     const audio = new Audio(url);
-    audio.play().catch(e => alert("Lỗi phát audio: " + e.message));
+    audio.play().catch(e => alert("Lỗi phát audio: " + (e.message || "File không tồn tại")));
   };
 
   // --- AUDIO PLAYBACK LOGIC ---
@@ -555,11 +564,13 @@ export const TeacherDashboard: React.FC = () => {
     window.speechSynthesis.cancel();
     playClick();
 
-    // 1. Try to play REAL RECORDING first
+    // 1. Try to play REAL RECORDING first (prefer readingAudioUrl)
     const weekRecord = student.history.find(h => h.week === selectedWeek);
-    if (weekRecord?.audioUrl) {
-      console.log("Playing real audio:", weekRecord.audioUrl);
-      const audio = new Audio(weekRecord.audioUrl || '');
+    const actualAudioUrl = weekRecord?.readingAudioUrl || weekRecord?.audioUrl;
+
+    if (actualAudioUrl) {
+      console.log("Playing real audio:", actualAudioUrl);
+      const audio = new Audio(actualAudioUrl);
 
       audio.play().catch(e => {
         alert("Không thể phát file ghi âm: " + e.message);
@@ -1047,49 +1058,37 @@ export const TeacherDashboard: React.FC = () => {
           )}
         </div>
 
+
         {/* Right Column: Alerts & Notes */}
         <div className="space-y-6">
           {/* Action Items / Alerts */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Cần Hỗ Trợ</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Cần Hỗ Trợ (Tuần {selectedWeek})</h3>
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                <div className="w-10 h-10 rounded-full bg-red-200 flex items-center justify-center text-red-700 font-bold flex-shrink-0">
-                  T
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900">Thào Thị Thảo</p>
-                  <p className="text-xs text-red-600">Chưa biết đọc</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
-                <div className="w-10 h-10 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 font-bold flex-shrink-0">
-                  L
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900">Vừ Bảo Ly</p>
-                  <p className="text-xs text-orange-600">Còn phải đánh vần</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
-                <div className="w-10 h-10 rounded-full bg-yellow-200 flex items-center justify-center text-yellow-700 font-bold flex-shrink-0">
-                  L
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900">Vừ Thành Long</p>
-                  <p className="text-xs text-yellow-600">Còn phải đánh vần</p>
-                </div>
-              </div>
+              {studentsNeedingSupport.length === 0 ? (
+                <p className="text-gray-500 text-sm italic">Tuần này tuyệt vời! Không có học sinh nào đạt điểm thấp.</p>
+              ) : (
+                studentsNeedingSupport.map(s => (
+                  <div key={s.id} className={`flex items-center gap-3 p-3 rounded-lg border ${s.currentScore < 50 ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0 ${s.currentScore < 50 ? 'bg-red-200 text-red-700' : 'bg-orange-200 text-orange-700'}`}>
+                      {s.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900">{s.name}</p>
+                      <p className={`text-xs ${s.currentScore < 50 ? 'text-red-600' : 'text-orange-600'}`}>
+                        {s.currentScore < 50 ? 'Cần hỗ trợ nhiều' : 'Cần rèn luyện thêm'} ({s.currentScore}đ)
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-            <button className="w-full mt-4 text-primary text-sm font-bold hover:underline">
-              Xem tất cả
-            </button>
           </div>
 
           {/* New: Manual Note Input Section */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-primary" />
+              <MessageSquare className="w-5 h-5 text-blue-600" />
               Ghi Chú Nhanh
             </h3>
 
@@ -1122,7 +1121,7 @@ export const TeacherDashboard: React.FC = () => {
               <button
                 onClick={handleSaveNote}
                 disabled={!selectedStudent || !noteContent}
-                className="w-full flex items-center justify-center px-4 py-2 bg-secondary text-blue-900 font-bold rounded-lg hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full flex items-center justify-center px-4 py-2 bg-yellow-100 text-blue-900 font-bold rounded-lg hover:bg-yellow-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Lưu Ghi Chú
