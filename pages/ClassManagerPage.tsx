@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Trash2, Users, ChevronLeft, X, UserPlus, Search, Upload } from 'lucide-react';
+import { Plus, Trash2, Users, ChevronLeft, X, UserPlus, Search, Upload, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { playClick, playSuccess, playError } from '../services/audioService';
 import { getStudents, saveStudents, syncWithServer } from '../services/studentService';
 import { StudentStats } from '../types';
+import * as XLSX from 'xlsx';
 
 interface ClassGroup {
   id: string;
@@ -17,7 +18,7 @@ export const ClassManagerPage: React.FC = () => {
   const [newClassName, setNewClassName] = useState('');
   // Khởi tạo state rỗng để an toàn cho SSR. Dữ liệu sẽ được tải trong useEffect.
   const [allStudents, setAllStudents] = useState<StudentStats[]>([]);
-  
+
   // State quản lý học sinh trong lớp
   const [selectedClass, setSelectedClass] = useState<ClassGroup | null>(null);
   const [studentName, setStudentName] = useState('');
@@ -42,7 +43,7 @@ export const ClassManagerPage: React.FC = () => {
     if (savedClasses) {
       try {
         // Bỏ qua studentCount cũ nếu có, vì ta sẽ tính lại một cách chính xác
-        const parsedClasses = JSON.parse(savedClasses).map(({id, name}: any) => ({id, name}));
+        const parsedClasses = JSON.parse(savedClasses).map(({ id, name }: any) => ({ id, name }));
         if (Array.isArray(parsedClasses)) {
           setClasses(parsedClasses);
         }
@@ -111,7 +112,7 @@ export const ClassManagerPage: React.FC = () => {
     // 1. Cập nhật danh sách tổng và lưu vào localStorage (thông qua service)
     const updatedAllStudents = [...allStudents, newStudent];
     saveStudents(updatedAllStudents);
-    
+
     // Thông báo cho các component khác biết để cập nhật
     window.dispatchEvent(new CustomEvent('students_updated'));
 
@@ -119,7 +120,7 @@ export const ClassManagerPage: React.FC = () => {
     setAllStudents(updatedAllStudents);
     setCurrentStudents([...currentStudents, newStudent]);
     setStudentName('');
-    
+
     // 3. Đồng bộ học sinh mới lên server
     try {
       await fetch('/api/students', {
@@ -131,7 +132,7 @@ export const ClassManagerPage: React.FC = () => {
       console.error("Failed to sync new student to server", err);
       // Có thể thêm thông báo lỗi cho người dùng ở đây
     }
-    
+
     playSuccess();
   };
 
@@ -158,10 +159,10 @@ export const ClassManagerPage: React.FC = () => {
       if (data.success) {
         playSuccess();
         alert(data.message);
-        
+
         // Sync and refresh
         await syncWithServer(selectedClass.id);
-        
+
         // Refresh local list logic (re-read from storage after sync might be needed, or just reload page)
         // For now, we reload the list from the updated storage
         openClassDetails(selectedClass);
@@ -192,7 +193,7 @@ export const ClassManagerPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-blue-50 p-6">
       <div className="max-w-4xl mx-auto">
-        <button 
+        <button
           onClick={() => navigate('/teacher')}
           className="flex items-center text-gray-600 hover:text-blue-600 mb-6 transition-colors"
         >
@@ -218,35 +219,35 @@ export const ClassManagerPage: React.FC = () => {
           {classes.map((cls) => {
             const studentCount = classStudentCounts.get(cls.id) || 0;
             return (
-              <div key={cls.id} 
-              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
-              onClick={() => openClassDetails(cls)}
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                    <Users className="w-6 h-6" />
+              <div key={cls.id}
+                className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
+                onClick={() => openClassDetails(cls)}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800">{cls.name}</h3>
+                      <p className="text-sm text-gray-500">{studentCount} học sinh</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-800">{cls.name}</h3>
-                    <p className="text-sm text-gray-500">{studentCount} học sinh</p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteClass(cls.id); }}
+                    className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center">
+                  <span className="text-sm text-blue-600 font-medium group-hover:underline">Quản lý danh sách &rarr;</span>
+                  <div className="bg-gray-100 p-1.5 rounded-full text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                    <UserPlus className="w-4 h-4" />
                   </div>
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDeleteClass(cls.id); }}
-                  className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
               </div>
-              
-              <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center">
-                <span className="text-sm text-blue-600 font-medium group-hover:underline">Quản lý danh sách &rarr;</span>
-                <div className="bg-gray-100 p-1.5 rounded-full text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                   <UserPlus className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
             );
           })}
         </div>
@@ -261,7 +262,7 @@ export const ClassManagerPage: React.FC = () => {
                   <X className="w-6 h-6" />
                 </button>
               </div>
-              
+
               <form onSubmit={handleAddClass}>
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Tên lớp</label>
@@ -274,7 +275,7 @@ export const ClassManagerPage: React.FC = () => {
                     autoFocus
                   />
                 </div>
-                
+
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -319,6 +320,22 @@ export const ClassManagerPage: React.FC = () => {
                   >
                     <Upload className="w-4 h-4 mr-1.5" /> Nhập Excel
                   </button>
+                  <button
+                    onClick={() => {
+                      playClick();
+                      const ws = XLSX.utils.json_to_sheet([
+                        { "STT": 1, "Họ và tên": "Nguyễn Văn A", "Ghi chú": "Ví dụ" },
+                        { "STT": 2, "Họ và tên": "Trần Thị B", "Ghi chú": "Ví dụ" }
+                      ]);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "DanhSach");
+                      XLSX.writeFile(wb, "Mau_Danh_Sach_Hoc_Sinh.xlsx");
+                    }}
+                    className="flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-bold hover:bg-blue-200 transition-colors border border-blue-200"
+                    title="Tải file mẫu Excel"
+                  >
+                    <Download className="w-4 h-4 mr-1.5" /> Tải Mẫu
+                  </button>
                   <button onClick={() => setSelectedClass(null)} className="text-gray-400 hover:text-gray-600 p-1 bg-gray-100 rounded-full ml-2">
                     <X className="w-6 h-6" />
                   </button>
@@ -327,15 +344,15 @@ export const ClassManagerPage: React.FC = () => {
 
               {/* Form thêm nhanh */}
               <form onSubmit={handleAddStudentToClass} className="mb-4 bg-blue-50 p-3 rounded-xl flex gap-2">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
                   placeholder="Nhập tên học sinh mới..."
                   className="flex-1 px-3 py-2 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
-                <button 
+                <button
                   type="submit"
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 flex items-center gap-1 whitespace-nowrap"
                 >

@@ -30,13 +30,44 @@ export default (localStudents, saveDBToCloud) => {
 
             const studentsToCreate = [];
             for (const row of data) {
-                // Support various column names
-                const name = row['Họ và tên'] || row['Name'] || row['Tên'] || row['Họ tên'] || row['student_name'];
+                // 1. Try exact/common keys
+                let name = row['Họ và tên'] || row['Name'] || row['Tên'] || row['Họ tên'] || row['student_name'];
+
+                // 2. Smart Search: Look for keys containing "tên" or "name" case-insensitive
+                if (!name) {
+                    const keys = Object.keys(row);
+                    for (const key of keys) {
+                        const lowerKey = key.toLowerCase();
+                        // Avoid keys that might be numbers or irrelevant like "stt"
+                        if ((lowerKey.includes('tên') || lowerKey.includes('name')) && !lowerKey.includes('stt')) {
+                            name = row[key];
+                            if (name) break;
+                        }
+                    }
+                }
+
+                // 3. Fallback by position: Usually Name is the 2nd column (index 1) if 1st is STT, 
+                //    or 1st column (index 0) if no STT.
+                if (!name) {
+                    const values = Object.values(row);
+                    // Check 2nd column (often Name after STT)
+                    if (values[1] && typeof values[1] === 'string' && isNaN(Number(values[1])) && values[1].length > 2) {
+                        name = values[1];
+                    }
+                    // Check 1st column
+                    else if (values[0] && typeof values[0] === 'string' && isNaN(Number(values[0])) && values[0].length > 2) {
+                        name = values[0];
+                    }
+                }
+
                 if (!name) continue;
+
+                name = String(name).trim();
+                if (name.length < 2) continue;
 
                 studentsToCreate.push({
                     id: `s${Date.now()}${Math.floor(Math.random() * 1000)}`,
-                    name: String(name).trim(),
+                    name: name,
                     classId: classId,
                     completedLessons: 0, averageScore: 0, readingSpeed: 0, history: [], lastPractice: new Date(), badges: []
                 });
