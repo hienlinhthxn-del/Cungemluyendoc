@@ -409,9 +409,13 @@ export const TeacherDashboard: React.FC = () => {
           saveStudents(newStudents);
           setNotification({ message: `Đã xóa học sinh ${name}`, type: 'success' });
         } else {
-          console.error("Server delete failed");
+          const errData = await res.json().catch(() => ({}));
+          console.error("Server delete failed:", errData);
           // Nếu server lỗi, khôi phục lại danh sách học sinh trên UI
-          setNotification({ message: `Lỗi server: không thể xóa học sinh ${name}.`, type: 'error' });
+          setNotification({
+            message: `Lỗi server: ${errData.error || 'máy chủ từ chối yêu cầu'} xóa học sinh ${name}.`,
+            type: 'error'
+          });
           setStudents(originalStudents);
         }
       } catch (err) {

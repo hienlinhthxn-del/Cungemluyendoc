@@ -282,33 +282,55 @@ export default (localStudents, saveDBToCloud, localClasses) => {
         const user = identifyUser(req);
         if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
 
-        if (mongoose.connection.readyState === 1) {
-            // Validate student belongs to a class owned by teacher
-            const student = await Student.findOne({ id: req.params.id });
-            if (student) {
-                const cls = await ClassModel.findOne({ id: student.classId, teacherId: user.id });
-                if (!cls && student.classId !== 'DEFAULT') { // Allow deleting legacy/default if needed? Better safe than sorry.
-                    return res.status(403).json({ error: 'Bạn không có quyền xóa học sinh này.' });
-                }
-            }
-            await Student.deleteOne({ id: req.params.id });
-            return res.json({ success: true });
-        }
-
-        // Fallback
-        const student = localStudents.find(s => s.id === req.params.id);
-        if (student) {
-            const isOwner = localClasses.some(c => c.id === student.classId && c.teacherId === user.id);
-            if (!isOwner && student.classId !== 'DEFAULT') {
-                return res.status(403).json({ error: 'Bạn không có quyền xóa học sinh này (Local).' });
-            }
-        }
-
         const studentId = req.params.id;
-        const initialLength = localStudents.length;
-        localStudents = localStudents.filter(s => s.id !== studentId);
 
-        if (localStudents.length < initialLength) saveDBToCloud();
+        if (mongoose.connection.readyState === 1) {
+            // MongoDB Mode
+            try {
+                // Validate student belongs to a class owned by teacher
+                const student = await Student.findOne({ id: studentId });
+                if (student) {
+                    // Relaxed Check: If classId is missing or 'DEFAULT', we might allow deletion 
+                    // if they are the teacher who created it, but since we don't have 'teacherId' 
+                    // directly on Student, we check the class.
+                    if (student.classId && student.classId !== 'DEFAULT') {
+                        const cls = await ClassModel.findOne({ id: student.classId, teacherId: user.id });
+                        if (!cls) {
+                            console.error(`[DELETE] Access Denied: Teacher ${user.id} does not own class ${student.classId}`);
+                            return res.status(403).json({ error: 'Bạn không có quyền xóa học sinh này (Lớp không thuộc quyền quản lý).' });
+                        }
+                    } else {
+                        // For DEFAULT or missing classId, we allow deletion for now to clean up legacy data
+                        console.log(`[DELETE] Allowing deletion of legacy student ${studentId} (class: ${student.classId})`);
+                    }
+                }
+                await Student.deleteOne({ id: studentId });
+                return res.json({ success: true });
+            } catch (err) {
+                console.error("[DELETE] Mongo Error:", err);
+                return res.status(500).json({ error: "Lỗi cơ sở dữ liệu khi xóa." });
+            }
+        }
+
+        // Local Mode Fallback
+        const studentIdx = localStudents.findIndex(s => s.id === studentId);
+        if (studentIdx === -1) {
+            return res.json({ success: true, message: "Học sinh đã được xóa hoặc không tồn tại." });
+        }
+
+        const student = localStudents[studentIdx];
+        const isOwner = student.classId && student.classId !== 'DEFAULT'
+            ? localClasses.some(c => c.id === student.classId && c.teacherId === user.id)
+            : true; // Allow legacy/default deletion
+
+        if (!isOwner) {
+            return res.status(403).json({ error: 'Bạn không có quyền xóa học sinh này (Local).' });
+        }
+
+        // IN-PLACE DELETE (Crucial: param rebind fails, must mutate or return new array)
+        // Since we don't return the array, we must splice.
+        localStudents.splice(studentIdx, 1);
+        saveDBToCloud();
         res.json({ success: true });
     });
 
