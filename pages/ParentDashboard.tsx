@@ -68,6 +68,15 @@ export const ParentDashboard: React.FC = () => {
 
         if (studentToSelect) {
           setSelectedStudent(studentToSelect);
+          // Check for action=contact to auto-open modal
+          if (params.get('action') === 'contact') {
+            setIsFeedbackModalOpen(true);
+          }
+        } else if (params.get('action') === 'contact') {
+          // Case: Trying to contact but no student selected yet
+          // Maybe set a flag to open it after selection, or just let them select first.
+          // For now, let's just alert or rely on them picking a student.
+          // alert("Vui lòng chọn tên con trước khi liên hệ giáo viên.");
         }
       } catch (e) {
         setError("Không thể tải dữ liệu học sinh.");

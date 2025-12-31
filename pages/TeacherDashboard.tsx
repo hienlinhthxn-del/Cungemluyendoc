@@ -154,10 +154,12 @@ export const TeacherDashboard: React.FC = () => {
     window.addEventListener('students_updated', handleDataUpdate);
     // Lắng nghe sự kiện thay đổi localStorage từ các tab khác (quan trọng cho môi trường local)
     window.addEventListener('storage', handleDataUpdate);
+    window.addEventListener('communications_updated', handleDataUpdate);
 
     return () => {
       window.removeEventListener('students_updated', handleDataUpdate);
       window.removeEventListener('storage', handleDataUpdate);
+      window.removeEventListener('communications_updated', handleDataUpdate);
     };
   }, [classId]); // Chỉ chạy lại khi classId thay đổi để tránh vòng lặp.
 
@@ -732,8 +734,8 @@ export const TeacherDashboard: React.FC = () => {
                   key={cls.id}
                   onClick={() => handleClassIdChange(cls.id)}
                   className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${classId === cls.id
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50'
                     }`}
                 >
                   {cls.name}

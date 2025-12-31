@@ -28,7 +28,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, role, onLogout }) => {
       case UserRole.PARENT:
         return [
           { label: 'Tiến Độ Của Con', icon: GraduationCap, path: '/parent' },
-          { label: 'Liên Hệ GV', icon: Users, path: '/parent/contact' },
+          { label: 'Liên Hệ GV', icon: Users, path: '/parent?action=contact' },
         ];
       default:
         return [];
@@ -59,11 +59,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, role, onLogout }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive(item.path)
+                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive(item.path)
                       ? 'text-primary bg-blue-50'
                       : 'text-gray-500 hover:text-primary hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <item.icon className="w-5 h-5 mr-1.5" />
                   {item.label}
@@ -99,11 +98,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, role, onLogout }) => {
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`flex items-center px-3 py-3 rounded-md text-base font-medium ${
-                    isActive(item.path)
+                  className={`flex items-center px-3 py-3 rounded-md text-base font-medium ${isActive(item.path)
                       ? 'text-primary bg-blue-50'
                       : 'text-gray-600 hover:text-primary hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <item.icon className="w-5 h-5 mr-3" />
                   {item.label}
