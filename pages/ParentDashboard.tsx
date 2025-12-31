@@ -89,11 +89,9 @@ export const ParentDashboard: React.FC = () => {
     loadStudentData();
   }, [location.search]); // Chạy lại khi URL hoặc student list thay đổi
 
-  // Initial Sync for Parent (Fetch ALL students so search works) - DISABLED to prevent overwriting local data
+  // Initial Sync for Parent (Fetch ALL students so search works)
   useEffect(() => {
-    // Tạm thời vô hiệu hóa việc đồng bộ tự động để tránh ghi đè dữ liệu mới nhất
-    // được lưu trên máy (ví dụ: điểm của học sinh vừa làm bài).
-    // syncWithServer();
+    syncWithServer();
   }, []);
 
   useEffect(() => {
@@ -349,14 +347,35 @@ export const ParentDashboard: React.FC = () => {
                   <span className={`font-bold text-sm ${record.score >= 80 ? 'text-green-600' : 'text-orange-500'}`}>
                     {record.score}đ
                   </span>
-                  {(record.readingAudioUrl || record.audioUrl) && (
-                    <button
-                      onClick={() => playAudioUrl(record.readingAudioUrl || record.audioUrl || '')}
-                      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded-full transition-colors"
-                    >
-                      <PlayCircle className="w-3 h-3" /> Nghe lại
-                    </button>
-                  )}
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {record.phonemeAudioUrl && (
+                      <button
+                        onClick={() => playAudioUrl(record.phonemeAudioUrl)}
+                        className="flex items-center gap-1 text-[9px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full transition-colors border border-blue-100"
+                        title="Nghe lại phần Âm/Vần"
+                      >
+                        Âm
+                      </button>
+                    )}
+                    {record.wordAudioUrl && (
+                      <button
+                        onClick={() => playAudioUrl(record.wordAudioUrl)}
+                        className="flex items-center gap-1 text-[9px] font-bold text-yellow-600 hover:text-yellow-800 bg-yellow-50 px-2 py-0.5 rounded-full transition-colors border border-yellow-100"
+                        title="Nghe lại phần Từ ngữ"
+                      >
+                        Từ
+                      </button>
+                    )}
+                    {(record.readingAudioUrl || record.audioUrl) && (
+                      <button
+                        onClick={() => playAudioUrl(record.readingAudioUrl || record.audioUrl || '')}
+                        className="flex items-center gap-1 text-[9px] font-bold text-green-600 hover:text-green-800 bg-green-50 px-2 py-0.5 rounded-full transition-colors border border-green-100"
+                        title="Nghe lại phần Đoạn văn"
+                      >
+                        <PlayCircle className="w-3 h-3" /> Bài đọc
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
