@@ -49,12 +49,13 @@ export const saveStudents = (students: StudentStats[]): void => {
 // NEW: Force sync with server (Call this from Dashboard)
 export const syncWithServer = async (classId?: string) => {
     try {
-        const url = classId ? `/api/students?classId=${classId}` : '/api/students';
+        // If classId is 'ALL', we fetch without a classId filter to get all students owned by the teacher
+        const url = (classId && classId !== 'ALL') ? `/api/students?classId=${classId}` : '/api/students';
         const token = localStorage.getItem('token');
         const headers: any = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        // Thêm { cache: 'no-store' } để đảm bảo luôn lấy dữ liệu mới nhất, tránh bị cache bởi trình duyệt hoặc CDN.
+        console.log(`[SYNC] Fetching students from: ${url}`);
         const response = await fetch(url, {
             headers,
             cache: 'no-store'
@@ -63,24 +64,23 @@ export const syncWithServer = async (classId?: string) => {
 
         const serverData: StudentStats[] = await response.json();
 
-        // --- LỚP BẢO VỆ DỮ LIỆU ---
-        // Chỉ ghi đè dữ liệu local khi server trả về một danh sách HỢP LỆ và CÓ DỮ LIỆU.
-        // Điều này ngăn chặn việc server trả về `[]` và xóa sạch dữ liệu của người dùng.
-        if (Array.isArray(serverData) && serverData.length > 0) {
-            console.log(`Đồng bộ thành công: Tải về ${serverData.length} học sinh cho lớp ${classId || 'ALL'}.`);
-            saveStudents(serverData);
-        } else if (Array.isArray(serverData) && serverData.length === 0) {
-            // Nếu server trả về mảng rỗng, đây là một tình huống nguy hiểm.
-            // Chúng ta KHÔNG ghi đè dữ liệu local.
-            const localStudents = getStudents();
-            if (localStudents.length > 0) {
-                console.warn(`Đồng bộ cảnh báo: Server trả về 0 học sinh cho lớp ${classId}. Giữ lại ${localStudents.length} học sinh trên máy.`);
-            } else {
-                // Nếu cả local cũng rỗng thì không có gì để mất, cứ lưu.
+        if (Array.isArray(serverData)) {
+            if (serverData.length > 0) {
+                console.log(`Đồng bộ thành công: Tải về ${serverData.length} học sinh.`);
                 saveStudents(serverData);
+            } else if (classId && classId !== 'ALL') {
+                // If specific class requested but empty, we SHOULD respect that it might be empty
+                console.warn(`Lớp ${classId} hiện chưa có học sinh trên server.`);
+                saveStudents([]);
+            } else {
+                // If global fetch it empty, be cautious
+                const localStudents = getStudents();
+                if (localStudents.length > 0) {
+                    console.warn("Server trả về danh sách rỗng cho toàn bộ tài khoản. Giữ lại dữ liệu local để an toàn.");
+                } else {
+                    saveStudents([]);
+                }
             }
-        } else {
-            console.error("Đồng bộ thất bại: Dữ liệu từ server không phải là một mảng hợp lệ.");
         }
     } catch (error) {
         console.error("Sync failed:", error);

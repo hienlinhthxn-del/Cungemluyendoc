@@ -947,7 +947,12 @@ export const TeacherDashboard: React.FC = () => {
                         <div className="w-8 h-8 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
                           {student.name.charAt(0)}
                         </div>
-                        <span className="font-medium text-gray-900">{student.name}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-gray-900">{student.name}</span>
+                          {classId === 'ALL' && student.classId && (
+                            <span className="text-[10px] text-gray-400 font-bold uppercase">Lớp: {student.classId}</span>
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -1077,6 +1082,7 @@ export const TeacherDashboard: React.FC = () => {
                       <p className="font-bold text-gray-900">{s.name}</p>
                       <p className={`text-xs ${s.currentScore < 50 ? 'text-red-600' : 'text-orange-600'}`}>
                         {s.currentScore < 50 ? 'Cần hỗ trợ nhiều' : 'Cần rèn luyện thêm'} ({s.currentScore}đ)
+                        {classId === 'ALL' && s.classId && ` • Lớp: ${s.classId}`}
                       </p>
                     </div>
                   </div>
