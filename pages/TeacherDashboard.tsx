@@ -9,7 +9,7 @@ import { playClick, playSuccess } from '../services/audioService';
 import { AssignHomeworkModal } from '../components/AssignHomeworkModal';
 import { EditStudentModal, EditFormState } from '../components/EditStudentModal';
 import { ChangePasswordForm } from './ChangePasswordForm';
-import { saveCommunication, getCommunications, Communication } from '../services/communicationService';
+import { saveCommunication, getCommunications, fetchCommunications, Communication } from '../services/communicationService';
 import { SystemHealthCheck } from '../components/SystemHealthCheck';
 import { getStudents, saveStudents, syncWithServer } from '../services/studentService';
 
@@ -129,9 +129,9 @@ export const TeacherDashboard: React.FC = () => {
 
   useEffect(() => {
     // Load feedback from parents
-    const handleDataUpdate = () => {
+    const handleDataUpdate = async () => {
       const newStudentsFromStorage = getStudents();
-      const allComms = getCommunications();
+      const allComms = await fetchCommunications();
       const feedback = allComms.filter(c => c.sender === 'PARENT');
       setParentFeedback(feedback);
 

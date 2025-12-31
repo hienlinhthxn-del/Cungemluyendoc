@@ -33,6 +33,7 @@ process.on('uncaughtException', (error) => {
 import Student from '../Student.js';
 import Lesson from './Lesson.js';
 import ClassModel from './Class.js';
+import Communication from './models/Communication.js';
 
 // Helper to load env manually if not loaded (for local dev)
 if (fs.existsSync('.env')) {
@@ -328,6 +329,53 @@ app.use('/api/students', studentRoutes(localStudents, saveDBToCloud));
 app.use('/api/lessons', lessonRoutes);
 
 app.use('/api/classes', classRoutes(localClasses, saveClassesToCloud));
+
+// --- COMMUNICATION ROUTES (New) ---
+const COMM_FILE = path.join(__dirname, 'communication-data.json');
+const getLocalComms = () => {
+    if (fs.existsSync(COMM_FILE)) {
+        try { return JSON.parse(fs.readFileSync(COMM_FILE, 'utf8')); } catch (e) { return []; }
+    }
+    return [];
+};
+const saveLocalComms = (data) => {
+    try { fs.writeFileSync(COMM_FILE, JSON.stringify(data, null, 2), 'utf8'); } catch (e) { console.error(e); }
+};
+
+app.get('/api/communications', async (req, res) => {
+    try {
+        if (mongoose.connection.readyState === 1) {
+            // MongoDB Connected
+            const comms = await Communication.find({}).sort({ timestamp: -1 });
+            return res.json(comms);
+        } else {
+            // Local fallback
+            return res.json(getLocalComms().sort((a, b) => b.timestamp - a.timestamp));
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/communications', async (req, res) => {
+    try {
+        const commData = req.body;
+        if (!commData.content) return res.status(400).json({ error: "Missing content" });
+
+        if (mongoose.connection.readyState === 1) {
+            const newComm = new Communication(commData);
+            await newComm.save();
+            return res.json(newComm);
+        } else {
+            const list = getLocalComms();
+            list.push(commData);
+            saveLocalComms(list);
+            return res.json(commData);
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // Route để học sinh nộp bài
 app.post('/api/submissions', uploadMiddleware, async (req, res) => {

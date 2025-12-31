@@ -5,7 +5,7 @@ import { MOCK_STUDENTS } from '../constants';
 import { Trophy, TrendingUp, Calendar, MessageCircle, PlayCircle, Search, User, ArrowLeft, Edit2, Check, X, Send, ExternalLink } from 'lucide-react';
 import { StudentStats } from '../types';
 import { playClick, playSuccess } from '../services/audioService';
-import { getCommunications, saveCommunication, Communication } from '../services/communicationService';
+import { getCommunications, saveCommunication, fetchCommunications, sendCommunication, Communication } from '../services/communicationService';
 
 import { getStudents, syncWithServer } from '../services/studentService';
 
@@ -32,14 +32,17 @@ export const ParentDashboard: React.FC = () => {
 
   React.useEffect(() => {
     // Load messages from teacher
-    if (selectedStudent) {
-      const allComms = getCommunications();
-      const messages = allComms.filter(c =>
-        c.sender === 'TEACHER' &&
-        (c.studentId === selectedStudent.id || !c.studentId) // Specific or Broadcast
-      );
-      setTeacherMessages(messages);
-    }
+    const loadMessages = async () => {
+      if (selectedStudent) {
+        const allComms = await fetchCommunications();
+        const messages = allComms.filter(c =>
+          c.sender === 'TEACHER' &&
+          (c.studentId === selectedStudent.id || !c.studentId) // Specific or Broadcast
+        );
+        setTeacherMessages(messages);
+      }
+    };
+    loadMessages();
   }, [selectedStudent]);
 
   // Effect này sẽ xử lý việc chọn học sinh từ URL hoặc localStorage
@@ -170,12 +173,13 @@ export const ParentDashboard: React.FC = () => {
     return getGreeting(selectedStudent.name);
   }, [selectedStudent, getGreeting]);
 
-  const handleSendFeedback = () => {
+  const handleSendFeedback = async () => {
     if (!feedbackMessage.trim() || !selectedStudent) return;
 
     playSuccess();
 
-    saveCommunication({
+    // Use async send
+    await sendCommunication({
       id: Date.now().toString(),
       studentId: selectedStudent.id,
       studentName: selectedStudent.name,
