@@ -324,9 +324,14 @@ export const ClassManagerPage: React.FC = () => {
                     onClick={() => {
                       playClick();
                       const ws = XLSX.utils.json_to_sheet([
-                        { "STT": 1, "Họ và tên": "Nguyễn Văn A", "Ghi chú": "Ví dụ" },
-                        { "STT": 2, "Họ và tên": "Trần Thị B", "Ghi chú": "Ví dụ" }
+                        { "STT": 1, "Họ và tên": "Nguyễn Văn A", "Ghi chú": "Điền tên học sinh vào cột này" },
+                        { "STT": 2, "Họ và tên": "Trần Thị B", "Ghi chú": "" }
                       ]);
+                      ws['!cols'] = [
+                        { wch: 10 }, // STT
+                        { wch: 30 }, // Họ và tên
+                        { wch: 30 }  // Ghi chú
+                      ];
                       const wb = XLSX.utils.book_new();
                       XLSX.utils.book_append_sheet(wb, ws, "DanhSach");
                       XLSX.writeFile(wb, "Mau_Danh_Sach_Hoc_Sinh.xlsx");
