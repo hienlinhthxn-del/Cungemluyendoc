@@ -37,10 +37,16 @@ export const saveLesson = async (lesson: Lesson): Promise<boolean> => {
             headers,
             body: JSON.stringify(lesson)
         });
-        return res.ok;
-    } catch (e) {
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Server returned ${res.status}`);
+        }
+
+        return true;
+    } catch (e: any) {
         console.error("Save lesson failed", e);
-        return false;
+        throw e; // Rethrow so component can catch and show message
     }
 };
 

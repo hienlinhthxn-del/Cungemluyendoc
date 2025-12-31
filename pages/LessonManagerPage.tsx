@@ -46,13 +46,15 @@ export const LessonManager: React.FC = () => {
             return;
         }
 
-        const success = await saveLesson(editingLesson);
-        if (success) {
-            alert('Đã lưu bài học thành công!');
-            setEditingLesson(null);
-            loadData(); // Refresh list
-        } else {
-            alert('Lỗi khi lưu bài học');
+        try {
+            const success = await saveLesson(editingLesson);
+            if (success) {
+                alert('Đã lưu bài học thành công!');
+                setEditingLesson(null);
+                loadData(); // Refresh list
+            }
+        } catch (err: any) {
+            alert(`Lỗi khi lưu bài học: ${err.message}`);
         }
     };
 

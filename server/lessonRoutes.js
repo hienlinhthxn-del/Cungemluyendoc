@@ -101,20 +101,32 @@ router.get('/', async (req, res) => {
 
 // CREATE / UPDATE Lesson (Teacher Only)
 router.post('/', authMiddleware, async (req, res) => {
-    const lessonData = req.body;
-    const teacherId = req.user.id; // From authMiddleware
+    const lessonData = { ...req.body };
+    const teacherId = req.user.id;
+
+    // Sanitize data: remove Mongo internal fields to avoid conflicts during upsert
+    delete lessonData._id;
+    delete lessonData.__v;
 
     if (mongoose.connection.readyState === 1) {
         try {
+            console.log(`[SAVE] Lesson ${lessonData.id} for Teacher ${teacherId}`);
             // Update or Create for THIS teacher
             const lesson = await Lesson.findOneAndUpdate(
                 { id: lessonData.id, teacherId },
                 { $set: { ...lessonData, teacherId } },
-                { new: true, upsert: true }
+                { new: true, upsert: true, setDefaultsOnInsert: true }
             );
             return res.json(lesson);
         } catch (e) {
             console.error("Mongo POST error:", e);
+            // Check for unique index constraint errors (most likely 'id' index from old schema)
+            if (e.code === 11000) {
+                return res.status(500).json({
+                    error: "Lỗi xung đột dữ liệu: Có thể chỉ mục 'id' cũ vẫn còn tồn tại. Vui lòng liên hệ hỗ trợ hoặc thử dùng một ID khác.",
+                    details: e.message
+                });
+            }
             res.status(500).json({ error: e.message });
         }
     } else {
