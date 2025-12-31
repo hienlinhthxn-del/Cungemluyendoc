@@ -76,9 +76,11 @@ export const TeacherDashboard: React.FC = () => {
             console.warn("Dữ liệu lớp học trong localStorage không hợp lệ, sẽ được bỏ qua.");
           }
         } else {
-          // This part is likely for a full-stack setup and might not be used
-          // in a client-side only deployment. It's safe to keep.
-          const res = await fetch('/api/classes');
+          const token = localStorage.getItem('token');
+          const headers: any = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          const res = await fetch('/api/classes', { headers });
           if (res.ok) {
             const classData = await res.json();
             setClasses(classData);
@@ -257,9 +259,13 @@ export const TeacherDashboard: React.FC = () => {
     }
 
     try {
+      const token = localStorage.getItem('token');
+      const headers: any = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/classes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           id: newClassCode,
           name: newClassName,
@@ -390,7 +396,14 @@ export const TeacherDashboard: React.FC = () => {
 
       // 3. Đồng bộ lên Server
       try {
-        const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
+        const token = localStorage.getItem('token');
+        const headers: any = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/students/${id}`, {
+          method: 'DELETE',
+          headers
+        });
         if (res.ok) {
           // Nếu server xóa thành công, cập nhật LocalStorage qua service
           saveStudents(newStudents);
@@ -476,9 +489,13 @@ export const TeacherDashboard: React.FC = () => {
       window.dispatchEvent(new CustomEvent('students_updated'));
       const updatedStudentForServer = updatedStudents.find(s => s.id === editingStudent.id);
       if (updatedStudentForServer) {
+        const token = localStorage.getItem('token');
+        const headers: any = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         fetch('/api/students', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(updatedStudentForServer)
         }).catch(console.error);
       }
@@ -829,7 +846,14 @@ export const TeacherDashboard: React.FC = () => {
               if (!window.confirm("Bạn có muốn quét Cloudinary để khôi phục các bài đọc bị mất link không?")) return;
               setNotification({ message: "Đang quét và khôi phục dữ liệu...", type: 'success' });
               try {
-                const res = await fetch('/api/admin/recover-from-cloud', { method: 'POST' });
+                const token = localStorage.getItem('token');
+                const headers: any = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const res = await fetch('/api/admin/recover-from-cloud', {
+                  method: 'POST',
+                  headers
+                });
                 const data = await res.json();
                 if (data.success) {
                   setNotification({ message: data.message, type: 'success' });
