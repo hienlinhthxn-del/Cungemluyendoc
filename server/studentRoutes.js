@@ -55,7 +55,8 @@ export default (localStudents, saveDBToCloud, localClasses) => {
             const data = xlsx.utils.sheet_to_json(sheet);
 
             const studentsToCreate = [];
-            for (const row of data) {
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
                 // ... (Name parsing logic kept same)
                 let name = row['Họ và tên'] || row['Name'] || row['Tên'] || row['Họ tên'] || row['student_name'];
                 if (!name) {
@@ -81,8 +82,11 @@ export default (localStudents, saveDBToCloud, localClasses) => {
                 name = String(name).trim();
                 if (name.length < 2) continue;
 
+                // Better ID generation: Timestamp + Padded Index + Larger Random Seed
+                const uniqueId = `s${Date.now()}${(i + 1).toString().padStart(3, '0')}${Math.floor(Math.random() * 10000)}`;
+
                 studentsToCreate.push({
-                    id: `s${Date.now()}${Math.floor(Math.random() * 1000)}`,
+                    id: uniqueId,
                     name: name,
                     classId: classId,
                     completedLessons: 0, averageScore: 0, readingSpeed: 0, history: [], lastPractice: new Date(), badges: []

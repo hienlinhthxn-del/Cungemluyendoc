@@ -15,9 +15,9 @@ export interface EditFormState {
     completedLessons: number;
     score: number;
     speed: string | number;
-    readingScore: number;
+    phonemeScore: number;
     wordScore: number;
-    sentenceScore: number;
+    readingScore: number;
     exerciseScore: number;
 }
 
@@ -27,9 +27,9 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ isOpen, onCl
         completedLessons: 0,
         score: 0,
         speed: '',
-        readingScore: 0,
+        phonemeScore: 0,
         wordScore: 0,
-        sentenceScore: 0,
+        readingScore: 0,
         exerciseScore: 0
     });
 
@@ -41,9 +41,9 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ isOpen, onCl
                 completedLessons: student.completedLessons,
                 score: weekRecord ? weekRecord.score : 0,
                 speed: weekRecord ? weekRecord.speed : 0,
-                readingScore: weekRecord?.readingScore || 0,
+                phonemeScore: weekRecord?.phonemeScore || 0,
                 wordScore: weekRecord?.wordScore || 0,
-                sentenceScore: weekRecord?.sentenceScore || 0,
+                readingScore: weekRecord?.readingScore || 0,
                 exerciseScore: weekRecord?.exerciseScore || 0
             });
         }
@@ -77,11 +77,11 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ isOpen, onCl
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Đọc âm</label>
                                 <input
                                     type="number" min="0" max="100"
-                                    value={editForm.readingScore}
+                                    value={editForm.phonemeScore}
                                     onChange={(e) => {
                                         const val = parseFloat(e.target.value) || 0;
-                                        const newScore = Math.round((val + editForm.wordScore + editForm.sentenceScore + editForm.exerciseScore) / 4);
-                                        setEditForm({ ...editForm, readingScore: val, score: newScore });
+                                        const newScore = Math.round((val + editForm.wordScore + editForm.readingScore + editForm.exerciseScore) / 4);
+                                        setEditForm({ ...editForm, phonemeScore: val, score: newScore });
                                     }}
                                     className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary"
                                 />
@@ -93,7 +93,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ isOpen, onCl
                                     value={editForm.wordScore}
                                     onChange={(e) => {
                                         const val = parseFloat(e.target.value) || 0;
-                                        const newScore = Math.round((editForm.readingScore + val + editForm.sentenceScore + editForm.exerciseScore) / 4);
+                                        const newScore = Math.round((editForm.phonemeScore + val + editForm.readingScore + editForm.exerciseScore) / 4);
                                         setEditForm({ ...editForm, wordScore: val, score: newScore });
                                     }}
                                     className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary"
@@ -103,11 +103,11 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ isOpen, onCl
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Câu đoạn</label>
                                 <input
                                     type="number" min="0" max="100"
-                                    value={editForm.sentenceScore}
+                                    value={editForm.readingScore}
                                     onChange={(e) => {
                                         const val = parseFloat(e.target.value) || 0;
-                                        const newScore = Math.round((editForm.readingScore + editForm.wordScore + val + editForm.exerciseScore) / 4);
-                                        setEditForm({ ...editForm, sentenceScore: val, score: newScore });
+                                        const newScore = Math.round((editForm.phonemeScore + editForm.wordScore + val + editForm.exerciseScore) / 4);
+                                        setEditForm({ ...editForm, readingScore: val, score: newScore });
                                     }}
                                     className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary"
                                 />
@@ -119,7 +119,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ isOpen, onCl
                                     value={editForm.exerciseScore}
                                     onChange={(e) => {
                                         const val = parseFloat(e.target.value) || 0;
-                                        const newScore = Math.round((editForm.readingScore + editForm.wordScore + editForm.sentenceScore + val) / 4);
+                                        const newScore = Math.round((editForm.phonemeScore + editForm.wordScore + editForm.readingScore + val) / 4);
                                         setEditForm({ ...editForm, exerciseScore: val, score: newScore });
                                     }}
                                     className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary"

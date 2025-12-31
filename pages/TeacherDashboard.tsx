@@ -44,7 +44,7 @@ export const TeacherDashboard: React.FC = () => {
     const validWeeks = allLessons
       .map(l => l.week)
       .filter((w): w is number => typeof w === 'number' && !isNaN(w));
-    return Array.from(new Set(validWeeks)).sort((a, b) => b - a);
+    return Array.from(new Set(validWeeks)).sort((a, b) => (b || 0) - (a || 0));
   }, [allLessons]);
 
   // Fetch Lessons and Classes on mount
@@ -84,6 +84,11 @@ export const TeacherDashboard: React.FC = () => {
             setClasses(classData);
           }
         }
+        // 3. Sync Students with Server
+        const studentSyncId = savedClassId || 'DEFAULT';
+        await syncWithServer(studentSyncId);
+        setStudents(getStudents());
+
       } catch (e) {
         console.error("Không thể tải dữ liệu ban đầu:", e);
         setError("Lỗi tải dữ liệu. Vui lòng kiểm tra kết nối và thử lại.");
