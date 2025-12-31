@@ -689,6 +689,9 @@ export const ReadingPractice: React.FC = () => {
         }
 
         // --- CRITICAL FIX: Handle Partial vs Full Logic ---
+        // Always save the URL for immediate playback ("Nghe lại")
+        setRecordedAudioUrl(url);
+
         if (partialTargetRef.current) {
           setEvaluationContext(partialTargetRef.current.label);
           // Pass the specific partial text to evaluate, ignoring any global spokenText mismatch
@@ -696,7 +699,7 @@ export const ReadingPractice: React.FC = () => {
           // DO NOT setPartialRecordingId(null) here. We wait for results.
         } else {
           setEvaluationContext("Toàn bộ bài học");
-          setRecordedAudioUrl(url);
+          // setRecordedAudioUrl(url); // Moved up to valid for all
         }
       };
 
@@ -793,7 +796,9 @@ export const ReadingPractice: React.FC = () => {
     let audioUrlToSave: string | null = null;
     try {
       const permanentAudioUrl = await uploadStudentAudio(audioBlob, part, score);
-      if (permanentAudioUrl) {
+      // Logic fix: Chỉ chấp nhận URL nếu nó là link web (http/https). 
+      // Nếu server trả về đường dẫn file cục bộ (VD: C:\...) thì không dùng được trên trình duyệt.
+      if (permanentAudioUrl && permanentAudioUrl.startsWith('http')) {
         audioUrlToSave = permanentAudioUrl;
       } else {
         // Nếu tải lên thất bại, chuyển sang Base64 nếu file không quá lớn.
@@ -803,6 +808,7 @@ export const ReadingPractice: React.FC = () => {
           audioUrlToSave = null;
         } else {
           console.warn(`Tải file thất bại cho phần: ${part}. Sẽ lưu tạm dưới dạng Base64.`);
+          // FORCE BASE64 SAVING FOR LOCAL ENVIRONMENT
           audioUrlToSave = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(audioBlob);
@@ -841,13 +847,20 @@ export const ReadingPractice: React.FC = () => {
     if (historyRecord) {
       // Cập nhật bản ghi đã có
       (historyRecord as any)[partScoreKey] = score;
-      if (audioUrlToSave) (historyRecord as any)[partAudioKey] = audioUrlToSave;
+      if (audioUrlToSave) {
+        (historyRecord as any)[partAudioKey] = audioUrlToSave;
+        // ALSO UPDATE MAIN AUDIO URL SO TEACHER CAN HEAR IT
+        historyRecord.audioUrl = audioUrlToSave;
+      }
     } else {
       // Tạo bản ghi mới cho tuần này
       historyRecord = {
         week: lesson.week, score: 0, speed: 0,
         [partScoreKey]: score,
-        ...(audioUrlToSave && { [partAudioKey]: audioUrlToSave }),
+        ...(audioUrlToSave && {
+          [partAudioKey]: audioUrlToSave,
+          audioUrl: audioUrlToSave // Set main audio URL
+        }),
       };
       student.history.push(historyRecord);
     }
@@ -903,6 +916,7 @@ export const ReadingPractice: React.FC = () => {
       // BƯỚC 1: GỌI AI CHẤM ĐIỂM
       const feedback = await evaluateReading(targetText, textToGrade, audioBase64, supportedMimeType);
 
+      setPartialRecordingId(null); // Reset trạng thái nút ghi âm để hiển thị player trong modal
       // BƯỚC 2: HIỂN THỊ KẾT QUẢ NGAY LẬP TỨC (Không chờ lưu file)
       setResult(feedback);
 

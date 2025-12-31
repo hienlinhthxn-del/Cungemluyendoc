@@ -31,8 +31,8 @@ const TeacherLoginModal: React.FC<{ isOpen: boolean; onClose: () => void; onLogi
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Lấy mật khẩu mặc định từ biến môi trường.
-    const defaultPassword = import.meta.env.VITE_TEACHER_PASSWORD;
+    // Lấy mật khẩu mặc định từ biến môi trường, hoặc dùng '123456' nếu chạy local không có env
+    const defaultPassword = import.meta.env.VITE_TEACHER_PASSWORD || '123456';
     // Ưu tiên mật khẩu do người dùng đặt trong localStorage, sau đó mới đến mật khẩu mặc định.
     const correctPassword =
       localStorage.getItem(LOCAL_STORAGE_KEYS.TEACHER_PASSWORD) ||

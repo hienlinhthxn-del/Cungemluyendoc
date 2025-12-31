@@ -54,7 +54,7 @@ export const TeacherDashboard: React.FC = () => {
     setClassId(savedClassId);
     const initialStudents = getStudents();
     setStudents(initialStudents);
-    
+
     const fetchData = async () => {
       try {
         // 1. Fetch Lessons
@@ -152,8 +152,13 @@ export const TeacherDashboard: React.FC = () => {
 
     handleDataUpdate(); // Initial load
     window.addEventListener('students_updated', handleDataUpdate);
+    // Lắng nghe sự kiện thay đổi localStorage từ các tab khác (quan trọng cho môi trường local)
+    window.addEventListener('storage', handleDataUpdate);
 
-    return () => window.removeEventListener('students_updated', handleDataUpdate);
+    return () => {
+      window.removeEventListener('students_updated', handleDataUpdate);
+      window.removeEventListener('storage', handleDataUpdate);
+    };
   }, [classId]); // Chỉ chạy lại khi classId thay đổi để tránh vòng lặp.
 
   // Add Student Modal State
@@ -205,7 +210,7 @@ export const TeacherDashboard: React.FC = () => {
       // Otherwise exact match
       return s.classId === classId;
     });
-    
+
     return classStudents.map(s => {
       // Đảm bảo s.history là một mảng trước khi gọi .find() để tránh lỗi
       const weekRecord = Array.isArray(s.history) ? s.history.find(h => h.week === selectedWeek) : null;
@@ -264,7 +269,7 @@ export const TeacherDashboard: React.FC = () => {
         setNewClassName('');
         setNewClassTeacher('');
         playSuccess();
-        
+
         // Auto switch to new class
         handleClassIdChange(data.id);
       } else {
@@ -462,7 +467,7 @@ export const TeacherDashboard: React.FC = () => {
           body: JSON.stringify(updatedStudentForServer)
         }).catch(console.error);
       }
-      
+
       return updatedStudents; // Trả về state mới
     });
 
@@ -687,7 +692,7 @@ export const TeacherDashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <form 
+            <form
               onSubmit={(e) => { e.preventDefault(); handleClassIdChange(inputClassId); }}
               className="flex items-center gap-2"
             >
@@ -695,8 +700,8 @@ export const TeacherDashboard: React.FC = () => {
               <div className="flex flex-col">
                 <label className="text-xs text-gray-500 font-semibold uppercase">Nhập Mã Lớp</label>
                 <div className="flex items-center gap-2">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={inputClassId}
                     onChange={(e) => setInputClassId(e.target.value)}
                     onBlur={() => handleClassIdChange(inputClassId)}
@@ -707,14 +712,14 @@ export const TeacherDashboard: React.FC = () => {
                 </div>
               </div>
             </form>
-            
-            <button 
+
+            <button
               onClick={() => handleClassIdChange('ALL')}
               className={`ml-3 px-4 py-2 rounded-xl border-2 transition-all flex flex-col items-center ${classId === 'ALL' ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:bg-blue-50'}`}
               title="Bấm vào đây để xem toàn bộ học sinh nếu bạn không tìm thấy lớp"
             >
-               <span className="text-[10px] font-bold uppercase tracking-wider">Tổng Hệ Thống</span>
-               <span className="text-xl font-black leading-none">{students.length} <span className="text-[10px] font-normal">em</span></span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Tổng Hệ Thống</span>
+              <span className="text-xl font-black leading-none">{students.length} <span className="text-[10px] font-normal">em</span></span>
             </button>
           </div>
 
@@ -726,11 +731,10 @@ export const TeacherDashboard: React.FC = () => {
                 <button
                   key={cls.id}
                   onClick={() => handleClassIdChange(cls.id)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
-                    classId === cls.id 
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105' 
+                  className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${classId === cls.id
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50'
-                  }`}
+                    }`}
                 >
                   {cls.name}
                 </button>
@@ -739,9 +743,9 @@ export const TeacherDashboard: React.FC = () => {
           )}
 
           <div className="flex items-center gap-4 mb-2">
-             <p className="text-gray-500 text-sm">
-                Tên lớp: <span className="font-bold text-gray-700">{currentClass.name}</span>
-             </p>
+            <p className="text-gray-500 text-sm">
+              Tên lớp: <span className="font-bold text-gray-700">{currentClass.name}</span>
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -928,7 +932,7 @@ export const TeacherDashboard: React.FC = () => {
                         <span className="font-medium text-gray-900">{student.name}</span>
                       </div>
                     </td>
-                    
+
                     {/* Âm / Vần */}
                     <td className="px-4 py-3 text-center border-l border-gray-100 bg-blue-50/30">
                       <div className="flex flex-col items-center gap-1">
@@ -938,7 +942,7 @@ export const TeacherDashboard: React.FC = () => {
                         ) : <span className="text-[10px] text-gray-300">--</span>}
                       </div>
                     </td>
-                    
+
                     {/* Từ Ngữ */}
                     <td className="px-4 py-3 text-center border-l border-gray-100 bg-yellow-50/30">
                       <div className="flex flex-col items-center gap-1">
@@ -948,7 +952,7 @@ export const TeacherDashboard: React.FC = () => {
                         ) : <span className="text-[10px] text-gray-300">--</span>}
                       </div>
                     </td>
-                    
+
                     {/* Đoạn Văn */}
                     <td className="px-4 py-3 text-center border-l border-gray-100 bg-green-50/30">
                       <div className="flex flex-col items-center gap-1">
@@ -958,7 +962,7 @@ export const TeacherDashboard: React.FC = () => {
                         ) : <span className="text-[10px] text-gray-300">--</span>}
                       </div>
                     </td>
-                    
+
                     <td className="px-6 py-4 text-center align-middle">
                       <span className={`font-bold text-xl ${student.currentScore >= 80 ? 'text-green-600' : student.currentScore >= 50 ? 'text-blue-600' : 'text-red-500'}`}>
                         {student.currentScore > 0 ? student.currentScore : '-'}
@@ -997,22 +1001,22 @@ export const TeacherDashboard: React.FC = () => {
         </div>
         {weekData.length === 0 && (
           <div className="text-center py-12 bg-gray-50 rounded-b-xl border-t border-gray-100">
-             <p className="text-gray-400 font-medium mb-2">Không tìm thấy học sinh nào trong lớp "{classId}".</p>
-             <div className="flex flex-col items-center gap-3">
-               <button onClick={() => handleClassIdChange('ALL')} className="text-blue-600 font-bold hover:underline">
-                  &larr; Bấm vào đây để xem tất cả {students.length} học sinh đang có
-               </button>
-               
-               {students.length > 0 && classId !== 'ALL' && classId !== 'DEFAULT' && (
-                 <button 
-                   onClick={handleMigrateStudents}
-                   className="px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg font-bold hover:bg-yellow-200 border border-yellow-300 flex items-center gap-2 shadow-sm"
-                 >
-                   <RefreshCw className="w-4 h-4" />
-                   Chuyển toàn bộ {students.length} HS về lớp này
-                 </button>
-               )}
-             </div>
+            <p className="text-gray-400 font-medium mb-2">Không tìm thấy học sinh nào trong lớp "{classId}".</p>
+            <div className="flex flex-col items-center gap-3">
+              <button onClick={() => handleClassIdChange('ALL')} className="text-blue-600 font-bold hover:underline">
+                &larr; Bấm vào đây để xem tất cả {students.length} học sinh đang có
+              </button>
+
+              {students.length > 0 && classId !== 'ALL' && classId !== 'DEFAULT' && (
+                <button
+                  onClick={handleMigrateStudents}
+                  className="px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg font-bold hover:bg-yellow-200 border border-yellow-300 flex items-center gap-2 shadow-sm"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Chuyển toàn bộ {students.length} HS về lớp này
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
