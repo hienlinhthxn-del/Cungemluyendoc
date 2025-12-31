@@ -8,11 +8,59 @@ import Student from '../Student.js'; // Import from root directory
 const router = express.Router();
 
 // Middleware for excel upload
-const uploadTemp = multer({ dest: 'uploads/temp/' });
+const uploadDir = 'uploads/temp/';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+const uploadTemp = multer({ dest: uploadDir });
 
 // This function needs access to the in-memory DB if used.
 // We pass it during router setup.
 export default (localStudents, saveDBToCloud) => {
+
+    // --- IMPORT STUDENTS FROM EXCEL (Placed first to avoid route conflicts) ---
+    router.post('/import', uploadTemp.single('file'), async (req, res) => {
+        try {
+            if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+            const workbook = xlsx.readFile(req.file.path);
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const data = xlsx.utils.sheet_to_json(sheet);
+            const classId = req.body.classId || '1A3';
+
+            const studentsToCreate = [];
+            for (const row of data) {
+                // Support various column names
+                const name = row['Họ và tên'] || row['Name'] || row['Tên'] || row['Họ tên'] || row['student_name'];
+                if (!name) continue;
+
+                studentsToCreate.push({
+                    id: `s${Date.now()}${Math.floor(Math.random() * 1000)}`,
+                    name: String(name).trim(),
+                    classId: classId,
+                    completedLessons: 0, averageScore: 0, readingSpeed: 0, history: [], lastPractice: new Date(), badges: []
+                });
+            }
+
+            if (studentsToCreate.length > 0) {
+                if (mongoose.connection.readyState === 1) {
+                    await Student.insertMany(studentsToCreate);
+                } else {
+                    localStudents.push(...studentsToCreate);
+                }
+            }
+
+            if (mongoose.connection.readyState !== 1) saveDBToCloud();
+
+            // Clean up file
+            try { fs.unlinkSync(req.file.path); } catch (e) { console.error("Warning: Could not delete temp file", e); }
+
+            res.json({ success: true, count: studentsToCreate.length, message: `Thêm thành công ${studentsToCreate.length} học sinh!` });
+        } catch (error) {
+            console.error("Import Error:", error);
+            res.status(500).json({ error: "Lỗi xử lý file Excel: " + error.message });
+        }
+    });
 
     /**
      * A helper function to encapsulate the logic for updating a student's progress.
@@ -181,42 +229,7 @@ export default (localStudents, saveDBToCloud) => {
     });
 
     // --- IMPORT STUDENTS FROM EXCEL ---
-    router.post('/import', uploadTemp.single('file'), async (req, res) => {
-        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-        const workbook = xlsx.readFile(req.file.path);
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const data = xlsx.utils.sheet_to_json(sheet);
-        const classId = req.body.classId || '1A3';
-
-        const studentsToCreate = [];
-        for (const row of data) {
-            const name = row['Họ và tên'] || row['Name'] || row['Tên'] || row['Họ tên'] || row['student_name'];
-            if (!name) continue;
-
-            studentsToCreate.push({
-                id: `s${Date.now()}${Math.floor(Math.random() * 1000)}`,
-                name: String(name).trim(),
-                classId: classId,
-                completedLessons: 0, averageScore: 0, readingSpeed: 0, history: [], lastPractice: new Date(), badges: []
-            });
-        }
-
-        if (studentsToCreate.length > 0) {
-            if (mongoose.connection.readyState === 1) {
-                // Use a single, efficient bulk insert operation
-                await Student.insertMany(studentsToCreate);
-            } else {
-                // Fallback: push all new students to the local array at once
-                localStudents.push(...studentsToCreate);
-            }
-        }
-
-        if (mongoose.connection.readyState !== 1) saveDBToCloud();
-        try { fs.unlinkSync(req.file.path); } catch (e) { console.error("Warning: Could not delete temp file", e); }
-
-        res.json({ success: true, count: studentsToCreate.length, message: `Thêm thành công ${studentsToCreate.length} học sinh!` });
-    });
 
     return router;
 };
