@@ -81,7 +81,8 @@ export const ReadingPractice: React.FC = () => {
         setIsLoadingLesson(false);
         return;
       }
-      const allLessons = await getLessons();
+      const classId = localStorage.getItem('student_class_id') || undefined;
+      const allLessons = await getLessons(classId);
       const foundLesson = allLessons.find(l => l.id === id);
       setLesson(foundLesson || null);
       setIsLoadingLesson(false);

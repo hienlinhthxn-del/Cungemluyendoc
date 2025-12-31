@@ -1,6 +1,8 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import Lesson from './Lesson.js';
+import ClassModel from './Class.js';
+import authMiddleware from './middleware/authMiddleware.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -40,105 +42,119 @@ const saveLocalLessons = (lessons) => {
 };
 
 // GET All Lessons
+// Supports:
+// 1. ?classId=... (For students: fetch their teacher's lessons or global)
+// 2. Auth Header (For teachers: fetch their custom lessons or global)
 router.get('/', async (req, res) => {
-    let mongoLessons = [];
-    let source = 'none';
+    const { classId } = req.query;
+    let teacherId = null;
 
-    // 1. Try to get from MongoDB
+    // Identify teacherId
+    if (classId) {
+        // STUDENT VIEW: Find class to get teacher
+        if (mongoose.connection.readyState === 1) {
+            const cls = await ClassModel.findOne({ id: classId });
+            if (cls) teacherId = cls.teacherId;
+        } else {
+            // Local fallback logic for class lookup can be added if needed
+        }
+    } else {
+        // TEACHER VIEW: Try to get from auth token
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            try {
+                const token = authHeader.split(' ')[1];
+                const jwt = (await import('jsonwebtoken')).default;
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+                teacherId = decoded.id;
+            } catch (e) {
+                // Ignore token errors for GET
+            }
+        }
+    }
+
     if (mongoose.connection.readyState === 1) {
         try {
-            mongoLessons = await Lesson.find().sort({ week: 1 });
-            source = 'mongodb';
+            // 1. Get Teacher's custom lessons
+            const teacherLessons = teacherId ? await Lesson.find({ teacherId }).sort({ week: 1 }) : [];
+
+            // 2. Get Global Default lessons (teacherId: null)
+            const globalLessons = await Lesson.find({ teacherId: null }).sort({ week: 1 });
+
+            // 3. Merge: Teacher lessons override Global ones by ID
+            const lessonMap = new Map();
+            globalLessons.forEach(l => lessonMap.set(l.id, l));
+            teacherLessons.forEach(l => lessonMap.set(l.id, l));
+
+            const finalLessons = Array.from(lessonMap.values());
+            console.log(`📡 Returning ${finalLessons.length} lessons (Teacher: ${teacherId || 'Global'})`);
+            return res.json(finalLessons.sort((a, b) => (a.week || 0) - (b.week || 0)));
         } catch (e) {
             console.error("Mongo GET error:", e);
         }
     }
 
-    // 2. Get local/default lessons
+    // Local Fallback
     const localLessons = getLocalLessons();
-
-    // 3. AUTO-MIGRATION / SYNC LOGIC
-    // If we have MongoDB but it's missing some lessons found in local/default
-    if (mongoose.connection.readyState === 1 && localLessons.length > 0) {
-        const mongoIds = new Set(mongoLessons.map(l => l.id));
-        const missingLessons = localLessons.filter(l => !mongoIds.has(l.id));
-
-        if (missingLessons.length > 0) {
-            console.log(`🔄 Syncing ${missingLessons.length} missing lessons to MongoDB...`);
-            try {
-                // Insert missing lessons one by one to avoid bulk insert issues with existing IDs (though filter should handle it)
-                for (const lesson of missingLessons) {
-                    await Lesson.findOneAndUpdate(
-                        { id: lesson.id },
-                        { $set: lesson },
-                        { upsert: true, new: true }
-                    );
-                }
-                // Re-fetch to get the complete list
-                mongoLessons = await Lesson.find().sort({ week: 1 });
-                console.log(`✅ Sync complete. Total lessons: ${mongoLessons.length}`);
-            } catch (syncError) {
-                console.error("❌ Auto-sync error:", syncError);
-            }
-        }
-    }
-
-    // 4. Return the best available data
-    let finalLessons = (mongoLessons && mongoLessons.length > 0) ? mongoLessons : localLessons;
-
-    console.log(`📡 Returning ${finalLessons.length} lessons (Source: ${source})`);
-    res.json(finalLessons.sort((a, b) => (a.week || 0) - (b.week || 0)));
+    res.json(localLessons.sort((a, b) => (a.week || 0) - (b.week || 0)));
 });
 
-// CREATE / UPDATE Lesson
-router.post('/', async (req, res) => {
+// CREATE / UPDATE Lesson (Teacher Only)
+router.post('/', authMiddleware, async (req, res) => {
     const lessonData = req.body;
+    const teacherId = req.user.id; // From authMiddleware
 
     if (mongoose.connection.readyState === 1) {
         try {
+            // Update or Create for THIS teacher
             const lesson = await Lesson.findOneAndUpdate(
-                { id: lessonData.id },
-                { $set: lessonData },
+                { id: lessonData.id, teacherId },
+                { $set: { ...lessonData, teacherId } },
                 { new: true, upsert: true }
             );
             return res.json(lesson);
         } catch (e) {
-            console.error("Mongo POST error, falling back:", e);
+            console.error("Mongo POST error:", e);
+            res.status(500).json({ error: e.message });
         }
-    }
-
-    // Fallback
-    console.warn("⚠️ MongoDB disconnected. Saving lesson locally.");
-    const lessons = getLocalLessons();
-    const idx = lessons.findIndex(l => l.id === lessonData.id);
-
-    if (idx >= 0) {
-        lessons[idx] = { ...lessons[idx], ...lessonData };
     } else {
-        lessons.push(lessonData);
+        // Fallback (Not multi-tenant friendly for local files, but kept for compatibility)
+        const lessons = getLocalLessons();
+        const idx = lessons.findIndex(l => l.id === lessonData.id);
+        if (idx >= 0) {
+            lessons[idx] = { ...lessons[idx], ...lessonData };
+        } else {
+            lessons.push(lessonData);
+        }
+        saveLocalLessons(lessons);
+        res.json(lessonData);
     }
-
-    saveLocalLessons(lessons);
-    res.json(lessonData);
 });
 
 // DELETE Lesson
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
+    const teacherId = req.user.id;
+    const lessonId = req.params.id;
+
     if (mongoose.connection.readyState === 1) {
         try {
-            await Lesson.deleteOne({ id: req.params.id });
+            // Only allow deleting lessons owned by this teacher
+            const result = await Lesson.deleteOne({ id: lessonId, teacherId });
+            if (result.deletedCount === 0) {
+                return res.status(403).json({ error: "Bạn không có quyền xóa bài này hoặc bài học mặc định." });
+            }
             return res.json({ success: true });
         } catch (e) {
-            console.error("Mongo DELETE error, falling back:", e);
+            console.error("Mongo DELETE error:", e);
+            res.status(500).json({ error: e.message });
         }
+    } else {
+        // Fallback
+        const lessons = getLocalLessons();
+        const newLessons = lessons.filter(l => l.id !== lessonId);
+        saveLocalLessons(newLessons);
+        res.json({ success: true });
     }
-
-    // Fallback
-    console.warn("⚠️ MongoDB disconnected. Deleting lesson locally.");
-    const lessons = getLocalLessons();
-    const newLessons = lessons.filter(l => l.id !== req.params.id);
-    saveLocalLessons(newLessons);
-    res.json({ success: true });
 });
 
 export default router;

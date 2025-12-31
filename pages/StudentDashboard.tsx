@@ -42,7 +42,7 @@ export const StudentDashboard: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await getLessons();
+        const data = await getLessons(savedClassId || undefined);
         if (data && data.length > 0) setAllLessons(data);
       } catch (err) {
         console.error("Lỗi tải bài học:", err);

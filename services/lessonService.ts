@@ -4,13 +4,14 @@ import { LESSONS as DEFAULT_LESSONS } from '../constants';
 let cachedLessons: Lesson[] = [];
 
 // Fetch lessons from server, fallback to constants if empty or offline
-export const getLessons = async (): Promise<Lesson[]> => {
+export const getLessons = async (classId?: string): Promise<Lesson[]> => {
     try {
         const token = localStorage.getItem('token');
         const headers: any = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const res = await fetch('/api/lessons', { headers });
+        const url = classId ? `/api/lessons?classId=${classId}` : '/api/lessons';
+        const res = await fetch(url, { headers });
         if (res.ok) {
             const data = await res.json();
             if (data && data.length > 0) {
