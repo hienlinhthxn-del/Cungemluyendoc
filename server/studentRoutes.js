@@ -1,7 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
-import * as xlsx from 'xlsx';
+import xlsx from 'xlsx';
 import fs from 'fs';
 import Student from '../Student.js'; // Import from root directory
 
