@@ -105,7 +105,7 @@ export const ClassManagerPage: React.FC = () => {
       averageScore: 0,
       readingSpeed: 0,
       history: [],
-      lastPractice: new Date().toISOString(),
+      lastPractice: new Date(),
       badges: []
     };
 
