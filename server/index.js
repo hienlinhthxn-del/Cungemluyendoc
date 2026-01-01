@@ -621,7 +621,12 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
             }
             saveDBToCloud();
         }
-        res.status(201).json({ success: true, audioUrl });
+        res.status(201).json({
+            success: true,
+            audioUrl,
+            part,
+            score: Number(score)
+        });
     } catch (error) {
         console.error('Error saving submission:', error);
         res.status(500).json({ error: 'Failed to save submission.' });

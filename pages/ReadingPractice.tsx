@@ -632,7 +632,7 @@ export const ReadingPractice: React.FC = () => {
     }
 
     // Ensure https for Cloudinary
-    if (sanitizedUrl.startsWith('http:')) {
+    if (sanitizedUrl && (sanitizedUrl.includes('cloudinary.com') || sanitizedUrl.startsWith('http:'))) {
       sanitizedUrl = sanitizedUrl.replace('http:', 'https:');
     }
 
@@ -826,9 +826,8 @@ export const ReadingPractice: React.FC = () => {
     formData.append('score', String(score));
 
     try {
-      // ĐÂY LÀ ENDPOINT MỚI, ĐÚNG CHO VIỆC NỘP BÀI CỦA HỌC SINH.
-      // Endpoint này cần được tạo ở phía backend để nhận file và lưu vào đúng bản ghi của học sinh.
-      const response = await fetch(`/ api / submissions`, {
+      // FIX: Removed spaces from the URL
+      const response = await fetch(`/api/submissions`, {
         method: 'POST',
         body: formData,
       });
@@ -837,7 +836,16 @@ export const ReadingPractice: React.FC = () => {
         throw new Error(errorData.error || 'Server từ chối yêu cầu nộp bài.');
       }
       const data = await response.json();
-      // Server nên trả về { success: true, audioUrl: '...' }
+      // Server returns { success: true, audioUrl: '...', part: '...', score: ... }
+
+      // OPTIONAL: Refresh local student list to show new score on dashboard immediately
+      const savedClassId = localStorage.getItem('student_class_id');
+      if (savedClassId) {
+        syncWithServer(savedClassId).then(() => {
+          window.dispatchEvent(new Event('students_updated'));
+        });
+      }
+
       return data.audioUrl;
     } catch (error) {
       console.error("Lỗi khi nộp bài của học sinh:", error);
@@ -1003,11 +1011,18 @@ export const ReadingPractice: React.FC = () => {
           else if (label.includes('Đoạn')) partKey = 'reading';
 
           if (partKey) {
-            await savePartialStudentResult(partKey, feedback.score, feedback.reading_speed || 0, blobToProcess);
+            const url = await savePartialStudentResult(partKey, feedback.score, feedback.reading_speed || 0, blobToProcess);
+            // Ensure result object is updated with the real URL for the modal player
+            if (url) {
+              setResult(prev => prev ? { ...prev, audioUrl: url } : null);
+            }
           }
         } else if (blobToProcess) {
           // This was a full recording, treat it as "Đoạn Văn"
-          await savePartialStudentResult('reading', feedback.score, feedback.reading_speed || 0, blobToProcess);
+          const url = await savePartialStudentResult('reading', feedback.score, feedback.reading_speed || 0, blobToProcess);
+          if (url) {
+            setResult(prev => prev ? { ...prev, audioUrl: url } : null);
+          }
         }
       }
 

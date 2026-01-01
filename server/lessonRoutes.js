@@ -106,6 +106,8 @@ export default (uploadMiddleware, LessonAudio) => {
             const authHeader = req.headers.authorization;
             const { classId } = req.query;
 
+            console.log(`[GET_AUDIO] Start - Lesson: ${lessonId}, ClassId: ${classId}, hasAuth: ${!!authHeader}`);
+
             if (authHeader && authHeader.startsWith('Bearer ')) {
                 try {
                     const token = authHeader.split(' ')[1];
@@ -113,23 +115,40 @@ export default (uploadMiddleware, LessonAudio) => {
                     const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
                     const decoded = jwt.verify(token, JWT_SECRET);
                     teacherId = decoded.id;
-                } catch (e) { }
+                    console.log(`[GET_AUDIO] Identified Teacher via Auth: ${teacherId}`);
+                } catch (e) {
+                    console.error(`[GET_AUDIO] Auth Token Error: ${e.message}`);
+                }
             } else if (classId && mongoose.connection.readyState === 1) {
                 const cls = await ClassModel.findOne({ id: classId });
-                if (cls && cls.teacherId) {
-                    teacherId = cls.teacherId.toString();
-                    console.log(`[GET_AUDIO] Identified Teacher: ${teacherId} from Class: ${classId}`);
+                if (cls) {
+                    teacherId = cls.teacherId ? cls.teacherId.toString() : null;
+                    console.log(`[GET_AUDIO] Identified Teacher via Class: ${teacherId} (Class: ${cls.name})`);
+                } else {
+                    console.warn(`[GET_AUDIO] Class not found: ${classId}`);
                 }
+            } else if (classId) {
+                console.warn(`[GET_AUDIO] MongoDB not connected, cannot lookup classId: ${classId}`);
             }
 
             if (mongoose.connection.readyState === 1) {
                 const query = {
                     lessonId,
-                    $or: [{ teacherId: null }, { teacherId }]
+                    $or: [
+                        { teacherId: null },
+                        { teacherId: teacherId },
+                        { teacherId: "" } // Catch empty strings too
+                    ]
                 };
-                console.log(`[GET_AUDIO] Querying MongoDB - Lesson: ${lessonId}, Teacher: ${teacherId}`);
+                console.log(`[GET_AUDIO] Final Query: ${JSON.stringify(query)}`);
                 const audios = await LessonAudio.find(query);
-                console.log(`[GET_AUDIO] Found ${audios.length} recordings.`);
+                console.log(`[GET_AUDIO] Found ${audios.length} recordings in DB.`);
+
+                // Log first few result URLs for debugging
+                if (audios.length > 0) {
+                    console.log(`[GET_AUDIO] Sample Result: ${audios[0].text} -> ${audios[0].audioUrl}`);
+                }
+
                 const audioMap = audios.reduce((acc, curr) => {
                     acc[curr.text || ""] = curr.audioUrl;
                     return acc;
@@ -137,8 +156,9 @@ export default (uploadMiddleware, LessonAudio) => {
                 return res.json(audioMap);
             }
 
-            res.json({}); // Default empty if not in Mongo (local fallback can be added if needed)
+            res.json({});
         } catch (error) {
+            console.error(`[GET_AUDIO] Fatal Error:`, error);
             res.status(500).json({ error: error.message });
         }
     });
