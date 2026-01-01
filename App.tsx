@@ -90,12 +90,31 @@ const AppContent: React.FC = () => {
     if (isAuthenticated && user) {
       setRole(UserRole.TEACHER);
       localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_ROLE, UserRole.TEACHER);
+    } else if (savedRole === UserRole.TEACHER) {
+      // Teachers MUST be authenticated. If role is teacher but not authenticated, 
+      // we don't set the role but stay on null (or redirect).
+      // However, we can try to re-hydrate from localStorage if the token is there.
+      // AuthContext handles re-hydration on mount, so if it's NOT authenticated now,
+      // it means the token is truly missing or invalid.
+      setRole(undefined); // Wait for AuthContext to settle
     } else if (savedRole) {
       setRole(savedRole as UserRole);
     } else {
       setRole(null);
     }
   }, [isAuthenticated, user]);
+
+  // Secondary effect to handle redirections for teachers
+  useEffect(() => {
+    if (role === undefined) return;
+
+    if (role === UserRole.TEACHER && !isAuthenticated) {
+      console.warn("Teacher session missing. Redirecting to login.");
+      setRole(null);
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.CURRENT_ROLE);
+      navigate('/login');
+    }
+  }, [role, isAuthenticated, navigate]);
 
   useEffect(() => {
     if (role && !isAuthenticated && role !== UserRole.TEACHER) {

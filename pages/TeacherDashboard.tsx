@@ -797,24 +797,26 @@ export const TeacherDashboard: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500">Thống kê:</span>
-            <div className="relative inline-block">
-              <select
-                value={selectedWeek}
-                onChange={(e) => setSelectedWeek(Number(e.target.value))}
-                className="appearance-none bg-blue-50 border border-blue-200 text-blue-800 font-bold py-1 px-3 pr-8 rounded-lg cursor-pointer hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              >
-                {weeks.map(w => (
-                  <option key={w} value={w}>Tuần {w}</option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-blue-800 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-gray-500 text-xs font-semibold uppercase">Thống kê Tuần:</span>
+            <div className="flex flex-wrap gap-1">
+              {weeks.map(w => (
+                <button
+                  key={w}
+                  onClick={() => { playClick(); setSelectedWeek(w); }}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all border ${selectedWeek === w
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'
+                    }`}
+                >
+                  {w}
+                </button>
+              ))}
             </div>
 
             <button
               onClick={handleSync}
-              className={`p-1.5 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors ${isSyncing ? 'animate-spin' : ''}`}
+              className={`p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors ${isSyncing ? 'animate-spin' : ''} border border-blue-100`}
               title="Cập nhật dữ liệu từ Server"
             >
               <RefreshCw className="w-5 h-5" />

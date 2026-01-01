@@ -10,6 +10,7 @@ import { ACHIEVEMENTS, Achievement } from './achievements';
 import { saveCommunication } from '../services/communicationService';
 import { saveStudentResult, getStudents } from '../services/studentService';
 import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../types';
 
 const READING_LIMIT_SECONDS = 900; // 15 minutes
 const QUIZ_LIMIT_SECONDS = 300; // 5 minutes
@@ -42,7 +43,8 @@ export const ReadingPractice: React.FC = () => {
   const [playbackRate, setPlaybackRate] = useState(0.8); // Add state for playback rate
 
   // --- TEACHER MODE STATE ---
-  const [isTeacherMode, setIsTeacherMode] = useState(false);
+  const { user } = useAuth();
+  const [isTeacherMode, setIsTeacherMode] = useState(user?.role === UserRole.TEACHER);
   const [customVoiceMap, setCustomVoiceMap] = useState<Record<string, string>>({});
   const [recordingTarget, setRecordingTarget] = useState<string | null>(null);
   const [isRecordingInitializing, setIsRecordingInitializing] = useState(false);
