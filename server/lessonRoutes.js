@@ -116,7 +116,10 @@ export default (uploadMiddleware, LessonAudio) => {
                 } catch (e) { }
             } else if (classId && mongoose.connection.readyState === 1) {
                 const cls = await ClassModel.findOne({ id: classId });
-                if (cls) teacherId = cls.teacherId;
+                if (cls && cls.teacherId) {
+                    teacherId = cls.teacherId.toString();
+                    console.log(`[GET_AUDIO] Identified Teacher: ${teacherId} from Class: ${classId}`);
+                }
             }
 
             if (mongoose.connection.readyState === 1) {

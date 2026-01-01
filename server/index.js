@@ -210,6 +210,59 @@ const connectDB = async () => {
             } catch (e) {
                 console.warn("⚠️ Could not cleanup legacy indexes:", e.message);
             }
+
+            // --- DATA CLEANUP: Fix malformed URLs (one-time) ---
+            try {
+                console.log("🛠️ Checking for malformed audio URLs (/uploads/http...)...");
+
+                // 1. Fix LessonAudio
+                const badAudios = await LessonAudio.find({ audioUrl: { $regex: /^\/uploads\/http/ } });
+                if (badAudios.length > 0) {
+                    console.log(`   - Found ${badAudios.length} malformed LessonAudio URLs. Fixing...`);
+                    for (const doc of badAudios) {
+                        doc.audioUrl = doc.audioUrl.replace(/^\/uploads\//, '').replace('http:', 'https:');
+                        await doc.save();
+                    }
+                }
+
+                // 2. Fix Student History
+                const studentsWithBadUrls = await Student.find({
+                    "history": {
+                        $elemMatch: {
+                            $or: [
+                                { audioUrl: { $regex: /^\/uploads\/http/ } },
+                                { phonemeAudioUrl: { $regex: /^\/uploads\/http/ } },
+                                { wordAudioUrl: { $regex: /^\/uploads\/http/ } },
+                                { readingAudioUrl: { $regex: /^\/uploads\/http/ } }
+                            ]
+                        }
+                    }
+                });
+
+                if (studentsWithBadUrls.length > 0) {
+                    console.log(`   - Found ${studentsWithBadUrls.length} students with malformed URLs. Fixing history...`);
+                    for (const student of studentsWithBadUrls) {
+                        let changed = false;
+                        student.history = student.history.map(h => {
+                            const fields = ['audioUrl', 'phonemeAudioUrl', 'wordAudioUrl', 'readingAudioUrl'];
+                            fields.forEach(f => {
+                                if (h[f] && h[f].startsWith('/uploads/http')) {
+                                    h[f] = h[f].replace(/^\/uploads\//, '').replace('http:', 'https:');
+                                    changed = true;
+                                }
+                            });
+                            return h;
+                        });
+                        if (changed) {
+                            student.markModified('history');
+                            await student.save();
+                        }
+                    }
+                }
+                console.log("✅ Data cleanup complete.");
+            } catch (e) {
+                console.warn("⚠️ Data cleanup failed:", e.message);
+            }
         } else {
             console.warn("⚠️ MONGODB_URI missing. ACTIVATING CLOUDINARY-DB MODE.");
             // If Cloudinary configured, try to load data

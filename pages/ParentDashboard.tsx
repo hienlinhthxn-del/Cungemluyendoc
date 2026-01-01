@@ -173,8 +173,31 @@ export const ParentDashboard: React.FC = () => {
 
   const playAudioUrl = (url: string) => {
     playClick();
-    const audio = new Audio(url);
-    audio.play().catch(e => alert("Lỗi phát audio: " + (e.message || "File không tồn tại hoặc lỗi định dạng")));
+    if (!url) return;
+
+    // Safety check: Fix malformed URLs on the fly
+    let sanitizedUrl = url;
+    if (url.startsWith('/uploads/http')) {
+      sanitizedUrl = url.replace(/^\/uploads\//, '');
+    }
+    // Ensure https for Cloudinary
+    if (sanitizedUrl.startsWith('http:')) {
+      sanitizedUrl = sanitizedUrl.replace('http:', 'https:');
+    }
+
+    console.log(`[PARENT_PLAY] Attempting to play: ${sanitizedUrl}`);
+
+    const audio = new Audio(sanitizedUrl);
+    audio.play().catch(e => {
+      console.error("[PARENT_PLAY] Playback failed:", e);
+      alert("Lỗi phát âm thanh: Trình duyệt không hỗ trợ định dạng này hoặc tệp không tồn tại.");
+    });
+
+    audio.onerror = (e) => {
+      console.error("[PARENT_PLAY] Audio Error event:", e);
+      const err = audio.error;
+      console.error(`[PARENT_PLAY] Details - Code: ${err?.code}, Message: ${err?.message}`);
+    };
   };
 
   const handleSendFeedback = async () => {
