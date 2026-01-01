@@ -619,8 +619,18 @@ export const ReadingPractice: React.FC = () => {
   const playAudio = (url: string) => {
     if (!audioPlayerRef.current) return;
 
+    // Safety check: Fix malformed URLs on the fly
+    let sanitizedUrl = url;
+    if (url.startsWith('/uploads/http')) {
+      sanitizedUrl = url.replace(/^\/uploads\//, '');
+    }
+    // Ensure https for Cloudinary
+    if (sanitizedUrl.startsWith('http:')) {
+      sanitizedUrl = sanitizedUrl.replace('http:', 'https:');
+    }
+
     // Add timestamp to bypass potential browser caching of failed requests
-    const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`;
+    const audioUrl = sanitizedUrl.includes('?') ? `${sanitizedUrl}&t=${Date.now()}` : `${sanitizedUrl}?t=${Date.now()}`;
 
     console.log(`[PLAY_AUDIO] Attempting to play: ${audioUrl}`);
 
@@ -633,7 +643,7 @@ export const ReadingPractice: React.FC = () => {
       setPlayingSection(null);
       console.error("[PLAY_AUDIO] Error event:", e);
       const audioError = audioPlayerRef.current?.error;
-      console.error(`[PLAY_AUDIO] Audio Error Details - Code: ${audioError?.code}, Message: ${audioError?.message}`);
+      console.error(`[PLAY_AUDIO] Audio Error Details - Code: ${audioError?.code}, Message: ${audioError?.message} `);
 
       if (audioError?.code === 4) {
         alert("Lỗi: Không tìm thấy tệp âm thanh hoặc định dạng không hỗ trợ trên trình duyệt này. Thầy/Cô vui lòng thử ghi âm lại hoặc sử dụng Google Chrome.");
@@ -799,7 +809,7 @@ export const ReadingPractice: React.FC = () => {
     const formData = new FormData();
     const ext = supportedMimeType.includes('mp4') ? 'mp4' : 'webm';
     // Create a unique filename using text and timestamp to prevent overwriting
-    const fileName = `submission_${currentStudentId}_w${lesson.week}_${part}_${Date.now()}.${ext}`;
+    const fileName = `submission_${currentStudentId}_w${lesson.week}_${part}_${Date.now()}.${ext} `;
 
     formData.append('audioFile', blob, fileName);
     formData.append('studentId', currentStudentId);
@@ -811,7 +821,7 @@ export const ReadingPractice: React.FC = () => {
     try {
       // ĐÂY LÀ ENDPOINT MỚI, ĐÚNG CHO VIỆC NỘP BÀI CỦA HỌC SINH.
       // Endpoint này cần được tạo ở phía backend để nhận file và lưu vào đúng bản ghi của học sinh.
-      const response = await fetch(`/api/submissions`, {
+      const response = await fetch(`/ api / submissions`, {
         method: 'POST',
         body: formData,
       });
@@ -825,7 +835,7 @@ export const ReadingPractice: React.FC = () => {
     } catch (error) {
       console.error("Lỗi khi nộp bài của học sinh:", error);
       const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
-      setNotification({ message: `Lỗi nộp bài: ${errorMessage}`, type: 'error' });
+      setNotification({ message: `Lỗi nộp bài: ${errorMessage} `, type: 'error' });
       return null;
     }
   };
@@ -857,7 +867,7 @@ export const ReadingPractice: React.FC = () => {
       } else {
         // Nếu tải lên thất bại, chuyển sang Base64 nếu file không quá lớn.
         if (audioBlob.size > MAX_BLOB_SIZE_FOR_BASE64) {
-          console.warn(`File ghi âm cho phần ${part} quá lớn (${(audioBlob.size / 1024 / 1024).toFixed(2)}MB) để lưu tạm. Sẽ chỉ lưu điểm.`);
+          console.warn(`File ghi âm cho phần ${part} quá lớn(${(audioBlob.size / 1024 / 1024).toFixed(2)}MB) để lưu tạm.Sẽ chỉ lưu điểm.`);
           setNotification({ message: `Ghi âm quá dài, chỉ lưu điểm số.`, type: 'error' });
           audioUrlToSave = null;
         } else {
@@ -872,7 +882,7 @@ export const ReadingPractice: React.FC = () => {
         }
       }
     } catch (uploadError) {
-      console.error(`Lỗi nghiêm trọng khi tải file cho phần ${part}:`, uploadError);
+      console.error(`Lỗi nghiêm trọng khi tải file cho phần ${part}: `, uploadError);
       // Ngay cả khi có lỗi nghiêm trọng, vẫn cố gắng lưu dưới dạng Base64.
       try {
         audioUrlToSave = await new Promise<string>((resolve, reject) => {
@@ -895,8 +905,8 @@ export const ReadingPractice: React.FC = () => {
     const student = allStudents[studentIndex];
     let historyRecord = student.history.find(h => h.week === lesson.week);
 
-    const partScoreKey = `${part}Score`;
-    const partAudioKey = `${part}AudioUrl`;
+    const partScoreKey = `${part} Score`;
+    const partAudioKey = `${part} AudioUrl`;
 
     if (historyRecord) {
       // Cập nhật bản ghi đã có
@@ -928,7 +938,7 @@ export const ReadingPractice: React.FC = () => {
       // Lưu lại vào localStorage
       allStudents[studentIndex] = student;
       localStorage.setItem('app_students_data', JSON.stringify(allStudents));
-      console.log(`[SAVE] Đã lưu thành công cho tuần ${lesson.week}. Dữ liệu mới:`, historyRecord);
+      console.log(`[SAVE] Đã lưu thành công cho tuần ${lesson.week}. Dữ liệu mới: `, historyRecord);
       // Thông báo cho các component khác (như TeacherDashboard) để làm mới
       window.dispatchEvent(new CustomEvent('students_updated'));
     } catch (e) {
