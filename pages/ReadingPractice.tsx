@@ -505,10 +505,16 @@ export const ReadingPractice: React.FC = () => {
 
     setIsUploading(text); // Set uploading state for UI feedback
 
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setNotification({ message: 'Lỗi: Bạn chưa đăng nhập hoặc phiên làm việc hết hạn. Vui lòng đăng nhập lại.', type: 'error' });
+      playError();
+      return;
+    }
+
     try {
-      const token = localStorage.getItem('token');
       const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(`/api/lessons/${lesson.id}/custom-audio`, {
         method: 'POST',

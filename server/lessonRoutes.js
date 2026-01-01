@@ -41,132 +41,183 @@ const saveLocalLessons = (lessons) => {
     }
 };
 
-// GET All Lessons
-// Supports:
-// 1. ?classId=... (For students: fetch their teacher's lessons or global)
-// 2. Auth Header (For teachers: fetch their custom lessons or global)
-router.get('/', async (req, res) => {
-    const { classId } = req.query;
-    let teacherId = null;
+// Routes are now defined within the exported function below
 
-    // Identify teacherId
-    if (classId) {
-        // STUDENT VIEW: Find class to get teacher
+export default (uploadMiddleware, LessonAudio) => {
+    // GET All Lessons
+    router.get('/', async (req, res) => {
+        const { classId } = req.query;
+        let teacherId = null;
+
+        // Identify teacherId
+        if (classId) {
+            // STUDENT VIEW: Find class to get teacher
+            if (mongoose.connection.readyState === 1) {
+                const cls = await ClassModel.findOne({ id: classId });
+                if (cls) teacherId = cls.teacherId;
+            }
+        } else {
+            // TEACHER VIEW: Try to get from auth token
+            const authHeader = req.headers.authorization;
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                try {
+                    const token = authHeader.split(' ')[1];
+                    const jwt = (await import('jsonwebtoken')).default;
+                    const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+                    const decoded = jwt.verify(token, JWT_SECRET);
+                    teacherId = decoded.id;
+                } catch (e) {
+                    // Ignore token errors for GET
+                }
+            }
+        }
+
         if (mongoose.connection.readyState === 1) {
-            const cls = await ClassModel.findOne({ id: classId });
-            if (cls) teacherId = cls.teacherId;
-        } else {
-            // Local fallback logic for class lookup can be added if needed
-        }
-    } else {
-        // TEACHER VIEW: Try to get from auth token
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
             try {
-                const token = authHeader.split(' ')[1];
-                const jwt = (await import('jsonwebtoken')).default;
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-                teacherId = decoded.id;
+                // 1. Get Teacher's custom lessons
+                const teacherLessons = teacherId ? await Lesson.find({ teacherId }).sort({ week: 1 }) : [];
+
+                // 2. Get Global Default lessons (teacherId: null)
+                const globalLessons = await Lesson.find({ teacherId: null }).sort({ week: 1 });
+
+                // 3. Merge: Teacher lessons override Global ones by ID
+                const lessonMap = new Map();
+                globalLessons.forEach(l => lessonMap.set(l.id, l));
+                teacherLessons.forEach(l => lessonMap.set(l.id, l));
+
+                const finalLessons = Array.from(lessonMap.values());
+                return res.json(finalLessons.sort((a, b) => (a.week || 0) - (b.week || 0)));
             } catch (e) {
-                // Ignore token errors for GET
+                console.error("Mongo GET error:", e);
             }
         }
-    }
 
-    if (mongoose.connection.readyState === 1) {
+        // Local Fallback
+        const localLessons = getLocalLessons();
+        res.json(localLessons.sort((a, b) => (a.week || 0) - (b.week || 0)));
+    });
+
+    // CUSTOM AUDIO: GET
+    router.get('/:lessonId/custom-audio', async (req, res) => {
         try {
-            // 1. Get Teacher's custom lessons
-            const teacherLessons = teacherId ? await Lesson.find({ teacherId }).sort({ week: 1 }) : [];
+            const { lessonId } = req.params;
+            let teacherId = null;
 
-            // 2. Get Global Default lessons (teacherId: null)
-            const globalLessons = await Lesson.find({ teacherId: null }).sort({ week: 1 });
+            const authHeader = req.headers.authorization;
+            const { classId } = req.query;
 
-            // 3. Merge: Teacher lessons override Global ones by ID
-            const lessonMap = new Map();
-            globalLessons.forEach(l => lessonMap.set(l.id, l));
-            teacherLessons.forEach(l => lessonMap.set(l.id, l));
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                try {
+                    const token = authHeader.split(' ')[1];
+                    const jwt = (await import('jsonwebtoken')).default;
+                    const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+                    const decoded = jwt.verify(token, JWT_SECRET);
+                    teacherId = decoded.id;
+                } catch (e) { }
+            } else if (classId && mongoose.connection.readyState === 1) {
+                const cls = await ClassModel.findOne({ id: classId });
+                if (cls) teacherId = cls.teacherId;
+            }
 
-            const finalLessons = Array.from(lessonMap.values());
-            console.log(`📡 Returning ${finalLessons.length} lessons (Teacher: ${teacherId || 'Global'})`);
-            return res.json(finalLessons.sort((a, b) => (a.week || 0) - (b.week || 0)));
-        } catch (e) {
-            console.error("Mongo GET error:", e);
-        }
-    }
-
-    // Local Fallback
-    const localLessons = getLocalLessons();
-    res.json(localLessons.sort((a, b) => (a.week || 0) - (b.week || 0)));
-});
-
-// CREATE / UPDATE Lesson (Teacher Only)
-router.post('/', authMiddleware, async (req, res) => {
-    const lessonData = { ...req.body };
-    const teacherId = req.user.id;
-
-    // Sanitize data: remove Mongo internal fields to avoid conflicts during upsert
-    delete lessonData._id;
-    delete lessonData.__v;
-
-    if (mongoose.connection.readyState === 1) {
-        try {
-            console.log(`[SAVE] Lesson ${lessonData.id} for Teacher ${teacherId}`);
-            // Update or Create for THIS teacher
-            const lesson = await Lesson.findOneAndUpdate(
-                { id: lessonData.id, teacherId },
-                { $set: { ...lessonData, teacherId } },
-                { new: true, upsert: true, setDefaultsOnInsert: true }
-            );
-            return res.json(lesson);
-        } catch (e) {
-            console.error("Mongo POST error:", e);
-            // Check for unique index constraint errors (most likely 'id' index from old schema)
-            if (e.code === 11000) {
-                return res.status(500).json({
-                    error: "Lỗi xung đột dữ liệu: Có thể chỉ mục 'id' cũ vẫn còn tồn tại. Vui lòng liên hệ hỗ trợ hoặc thử dùng một ID khác.",
-                    details: e.message
+            if (mongoose.connection.readyState === 1) {
+                const audios = await LessonAudio.find({
+                    lessonId,
+                    $or: [{ teacherId: null }, { teacherId }]
                 });
+                const audioMap = audios.reduce((acc, curr) => {
+                    acc[curr.text || ""] = curr.audioUrl;
+                    return acc;
+                }, {});
+                return res.json(audioMap);
             }
-            res.status(500).json({ error: e.message });
-        }
-    } else {
-        // Fallback (Not multi-tenant friendly for local files, but kept for compatibility)
-        const lessons = getLocalLessons();
-        const idx = lessons.findIndex(l => l.id === lessonData.id);
-        if (idx >= 0) {
-            lessons[idx] = { ...lessons[idx], ...lessonData };
-        } else {
-            lessons.push(lessonData);
-        }
-        saveLocalLessons(lessons);
-        res.json(lessonData);
-    }
-});
 
-// DELETE Lesson
-router.delete('/:id', authMiddleware, async (req, res) => {
-    const teacherId = req.user.id;
-    const lessonId = req.params.id;
+            res.json({}); // Default empty if not in Mongo (local fallback can be added if needed)
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
 
-    if (mongoose.connection.readyState === 1) {
+    // CUSTOM AUDIO: POST (Teacher Only)
+    router.post('/:lessonId/custom-audio', authMiddleware, uploadMiddleware, async (req, res) => {
         try {
-            // Only allow deleting lessons owned by this teacher
-            const result = await Lesson.deleteOne({ id: lessonId, teacherId });
-            if (result.deletedCount === 0) {
-                return res.status(403).json({ error: "Bạn không có quyền xóa bài này hoặc bài học mặc định." });
-            }
-            return res.json({ success: true });
-        } catch (e) {
-            console.error("Mongo DELETE error:", e);
-            res.status(500).json({ error: e.message });
-        }
-    } else {
-        // Fallback
-        const lessons = getLocalLessons();
-        const newLessons = lessons.filter(l => l.id !== lessonId);
-        saveLocalLessons(newLessons);
-        res.json({ success: true });
-    }
-});
+            const { lessonId } = req.params;
+            const { text } = req.body;
+            const teacherId = req.user.id;
 
-export default router;
+            if (!req.file) return res.status(400).json({ error: 'No audio file received' });
+
+            let audioUrl;
+            if (req.file.secure_url) {
+                audioUrl = req.file.secure_url.replace('http:', 'https:');
+            } else {
+                audioUrl = `/uploads/${req.file.filename}`;
+            }
+
+            if (mongoose.connection.readyState === 1) {
+                await LessonAudio.findOneAndUpdate(
+                    { lessonId, text, teacherId },
+                    { audioUrl },
+                    { upsert: true, new: true }
+                );
+            }
+
+            res.json({ audioUrl, text });
+        } catch (error) {
+            res.status(500).json({ error: 'Upload failed', details: error.message });
+        }
+    });
+
+    // CREATE / UPDATE Lesson (Teacher Only)
+    router.post('/', authMiddleware, async (req, res) => {
+        const lessonData = { ...req.body };
+        const teacherId = req.user.id;
+
+        delete lessonData._id;
+        delete lessonData.__v;
+
+        if (mongoose.connection.readyState === 1) {
+            try {
+                const lesson = await Lesson.findOneAndUpdate(
+                    { id: lessonData.id, teacherId },
+                    { $set: { ...lessonData, teacherId } },
+                    { new: true, upsert: true, setDefaultsOnInsert: true }
+                );
+                return res.json(lesson);
+            } catch (e) {
+                res.status(500).json({ error: e.message });
+            }
+        } else {
+            const lessons = getLocalLessons();
+            const idx = lessons.findIndex(l => l.id === lessonData.id);
+            if (idx >= 0) lessons[idx] = { ...lessons[idx], ...lessonData };
+            else lessons.push(lessonData);
+            saveLocalLessons(lessons);
+            res.json(lessonData);
+        }
+    });
+
+    // DELETE Lesson
+    router.delete('/:id', authMiddleware, async (req, res) => {
+        const teacherId = req.user.id;
+        const lessonId = req.params.id;
+
+        if (mongoose.connection.readyState === 1) {
+            try {
+                const result = await Lesson.deleteOne({ id: lessonId, teacherId });
+                if (result.deletedCount === 0) {
+                    return res.status(403).json({ error: "Bạn không có quyền xóa bài này." });
+                }
+                return res.json({ success: true });
+            } catch (e) {
+                res.status(500).json({ error: e.message });
+            }
+        } else {
+            const lessons = getLocalLessons();
+            const newLessons = lessons.filter(l => l.id !== lessonId);
+            saveLocalLessons(newLessons);
+            res.json({ success: true });
+        }
+    });
+
+    return router;
+};

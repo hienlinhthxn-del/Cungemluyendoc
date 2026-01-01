@@ -8,7 +8,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+
+// JWT_SECRET is accessed via process.env where needed to ensure latest value
+const getJwtSecret = () => process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
 // --- LOCAL STORAGE FALLBACK ---
 const __filename = fileURLToPath(import.meta.url);
@@ -119,7 +121,7 @@ router.post('/login', async (req, res) => {
         // Generate Token
         const token = jwt.sign(
             { id: teacher._id, username: teacher.username },
-            JWT_SECRET,
+            getJwtSecret(),
             { expiresIn: '30d' }
         );
 

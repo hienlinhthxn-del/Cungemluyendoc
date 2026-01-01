@@ -1,3 +1,8 @@
+import dotenv from 'dotenv'; // Load env vars
+if (fs.existsSync('.env')) {
+    dotenv.config();
+}
+
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -9,7 +14,6 @@ import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import * as xlsx from 'xlsx';
-import dotenv from 'dotenv'; // Load env vars
 
 // Import modular routes
 import studentRoutes from './studentRoutes.js';
@@ -37,13 +41,10 @@ import Lesson from './Lesson.js';
 import ClassModel from './Class.js';
 import Communication from './models/Communication.js';
 import authRoutes from './routes/authRoutes.js';
+import LessonAudio from './models/LessonAudio.js';
 
-// Helper to load env manually if not loaded (for local dev)
-if (fs.existsSync('.env')) {
-    dotenv.config();
-}
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+// JWT_SECRET is accessed via process.env where needed to ensure latest value
+const JWT_SECRET = () => process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
 // Setup paths for ES Module
 const __filename = fileURLToPath(import.meta.url);
@@ -276,15 +277,8 @@ const uploadMiddleware = (req, res, next) => {
     });
 };
 
-// --- 4. DATA MODELS (Quick inline schema) ---
-const LessonAudioSchema = new mongoose.Schema({
-    lessonId: String,
-    teacherId: { type: String, required: false, default: null }, // Link to a specific teacher
-    text: String,
-    audioUrl: String,
-    createdAt: { type: Date, default: Date.now }
-});
-const LessonAudio = mongoose.model('LessonAudio', LessonAudioSchema);
+// --- 4. DATA MODELS ---
+// LessonAudio model is now imported from ./models/LessonAudio.js
 
 // In-Memory Database (Synced to Cloudinary & Local File)
 let localStudents = [];
@@ -383,7 +377,7 @@ const saveAudioMap = (data) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes(localStudents, saveDBToCloud, localClasses));
 
-app.use('/api/lessons', lessonRoutes);
+app.use('/api/lessons', lessonRoutes(uploadMiddleware, LessonAudio));
 
 app.use('/api/classes', classRoutes(localClasses, saveClassesToCloud));
 
@@ -539,103 +533,8 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Upload Audio Route
-app.post('/api/lessons/:lessonId/custom-audio', authMiddleware, uploadMiddleware, async (req, res) => {
-    try {
-        const { lessonId } = req.params;
-        const { text } = req.body;
-        const teacherId = req.user.id;
-
-        console.log(`📥 Upload Request for: [${text}] by Teacher: ${teacherId}`);
-
-        if (!req.file) {
-            return res.status(400).json({ error: 'No audio file received' });
-        }
-
-        // Force HTTPS for Cloudinary or Use Relative Path for Local
-        let audioUrl;
-        if (req.file.secure_url) {
-            audioUrl = req.file.secure_url;
-            if (audioUrl.startsWith('http:') && audioUrl.includes('cloudinary.com')) {
-                audioUrl = audioUrl.replace('http:', 'https:');
-            }
-        } else {
-            audioUrl = `/uploads/${req.file.filename}`;
-        }
-
-        // Save to DB (or JSON fallback)
-        if (mongoose.connection.readyState === 1) {
-            await LessonAudio.findOneAndUpdate(
-                { lessonId, text, teacherId },
-                { audioUrl },
-                { upsert: true, new: true }
-            );
-            console.log(`✅ Saved to MongoDB: Teacher ${teacherId} [${text}] -> ${audioUrl}`);
-        } else {
-            // Local fallback (Limited multi-tenancy for files)
-            const map = loadAudioMap();
-            const key = `${teacherId || 'default'}_${lessonId}`;
-            if (!map[key]) map[key] = {};
-            map[key][text] = audioUrl;
-            saveAudioMap(map);
-        }
-
-        res.json({ audioUrl, text });
-    } catch (error) {
-        console.error("❌ Processing Error:", error);
-        res.status(500).json({ error: 'Server processing failed', details: error.message });
-    }
-});
-
-// Get Audio Mapping Route
-app.get('/api/lessons/:lessonId/custom-audio', async (req, res) => {
-    try {
-        const { lessonId } = req.params;
-        let teacherId = null;
-
-        // Try to identify teacher from header (for teacher view) or from classId (for student view)
-        const authHeader = req.headers.authorization;
-        const { classId } = req.query;
-
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            try {
-                const token = authHeader.split(' ')[1];
-                const decoded = jwt.verify(token, JWT_SECRET);
-                teacherId = decoded.id;
-            } catch (e) {
-                console.error("Fetch Audio Auth Error:", e.message);
-            }
-        } else if (classId && mongoose.connection.readyState === 1) {
-            const cls = await ClassModel.findOne({ id: classId });
-            if (cls) teacherId = cls.teacherId;
-        }
-
-        // Prioritize Mongo if connected
-        if (mongoose.connection.readyState === 1) {
-            // Find shared (null) or teacher-specific audio
-            const audios = await LessonAudio.find({
-                lessonId,
-                $or: [{ teacherId: null }, { teacherId }]
-            });
-
-            // Convert to map: { "text": "url" }
-            // Teacher specific audio overrides global if both exist
-            const audioMap = audios.reduce((acc, curr) => {
-                acc[curr.text || ""] = curr.audioUrl;
-                return acc;
-            }, {});
-            return res.json(audioMap);
-        }
-
-        // Fallback to local JSON map
-        const map = loadAudioMap();
-        const key = `${teacherId || 'default'}_${lessonId}`;
-        res.json(map[key] || map[lessonId] || {});
-    } catch (error) {
-        console.error("Fetch Audio Error:", error);
-        res.status(500).json({ error: 'Failed to fetch audio' });
-    }
-});
+// Submissions and Communications routes remain in index.js for now.
+// Custom lesson audio routes have been refactored into lessonRoutes.js.
 
 // --- DEBUG ROUTE: Check Cloudinary Connection ---
 app.get('/api/test-cloudinary', async (req, res) => {
