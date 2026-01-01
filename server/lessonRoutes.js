@@ -7,6 +7,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DEFAULT_LESSONS } from './data/defaultLessons.js';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
 const router = express.Router();
 

@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import dotenv from 'dotenv'; // Load env vars
 if (fs.existsSync('.env')) {
     dotenv.config();
@@ -5,8 +7,6 @@ if (fs.existsSync('.env')) {
 
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
