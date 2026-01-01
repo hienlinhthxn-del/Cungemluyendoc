@@ -161,7 +161,7 @@ export const evaluateReading = async (
   };
 
   // 3. ROBUST EXECUTION WITH FALLBACK
-  const modelsToTry = [selectedModel, 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.0-pro'];
+  const modelsToTry = [selectedModel, 'gemini-1.5-flash-001', 'gemini-1.5-pro-001', 'gemini-1.0-pro'];
   // Deduplicate models
   const uniqueModels = [...new Set(modelsToTry)];
 

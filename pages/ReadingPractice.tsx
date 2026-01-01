@@ -294,6 +294,8 @@ export const ReadingPractice: React.FC = () => {
           throw new Error('Network response was not ok');
         }
         const data: Record<string, string> = await response.json();
+        console.log(`[DEBUG_AUDIO] Received VoiceMap keys: ${Object.keys(data).join(', ')}`);
+        console.log(`[DEBUG_AUDIO] Sample Entry: ${Object.entries(data)[0] || 'Empty'}`);
         setCustomVoiceMap(data);
       } catch (error) {
         console.error("Failed to fetch custom audio:", error);
