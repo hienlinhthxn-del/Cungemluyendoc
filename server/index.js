@@ -324,10 +324,8 @@ if (cloudName && apiKey && apiSecret) {
         params: {
             folder: 'reading-app-audio',
             resource_type: 'auto',
-            format: async (req, file) => {
-                // Keep original extension or fallback
-                return file.originalname.split('.').pop() || 'webm';
-            },
+            // REMOVED 'format' parameter to prevent "Invalid extension webm" errors during sync conversion.
+            // Cloudinary will automatically detect the format based on the stream/file content.
             public_id: (req, file) => {
                 // Use original filename (without extension) + timestamp to ensure uniqueness
                 const name = file.originalname.split('.')[0];
@@ -581,19 +579,20 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
             let historyRecord = student.history.find(h => h.week === Number(week));
             if (historyRecord) {
                 historyRecord[audioUrlKey] = audioUrl; // Cập nhật audio
-                if (score !== undefined) {
+                if (score !== undefined && score !== null && !isNaN(Number(score))) {
                     historyRecord[scoreKey] = Number(score); // Cập nhật điểm thành phần
 
                     // --- TÍNH LẠI ĐIỂM TRUNG BÌNH (Server Calculation) ---
                     // Lấy các điểm thành phần hiện tại (hoặc vừa được cập nhật)
-                    const pScore = scoreKey === 'phonemeScore' ? Number(score) : historyRecord.phonemeScore;
-                    const wScore = scoreKey === 'wordScore' ? Number(score) : historyRecord.wordScore;
-                    const rScore = scoreKey === 'readingScore' ? Number(score) : historyRecord.readingScore;
+                    // Hỗ trợ cả phím có khoảng trắng (legacy) và không có khoảng trắng (mới)
+                    const pScore = historyRecord.phonemeScore ?? historyRecord['phoneme Score'];
+                    const wScore = historyRecord.wordScore ?? historyRecord['word Score'];
+                    const rScore = historyRecord.readingScore ?? historyRecord['reading Score'];
 
                     // Chỉ tính trung bình trên các phần ĐÃ CÓ ĐIỂM
-                    const availableScores = [pScore, wScore, rScore].filter(s => s !== undefined && s !== null);
+                    const availableScores = [pScore, wScore, rScore].filter(s => s !== undefined && s !== null && !isNaN(Number(s)));
                     if (availableScores.length > 0) {
-                        const newTotal = Math.round(availableScores.reduce((a, b) => a + b, 0) / availableScores.length);
+                        const newTotal = Math.round(availableScores.reduce((a, b) => Number(a) + Number(b), 0) / availableScores.length);
                         historyRecord.score = newTotal;
                     }
                 }

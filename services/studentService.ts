@@ -29,7 +29,27 @@ export const getStudents = (): StudentStats[] => {
             if (key === 'lastPractice') return new Date(value);
             return value;
         });
-        return cleanupAndDedupe(parsed);
+
+        // Post-process to fix legacy keys with spaces if they exist in local cache
+        const processed = parsed.map((s: any) => {
+            if (s.history && Array.isArray(s.history)) {
+                s.history = s.history.map((h: any) => {
+                    const parts = ['phoneme', 'word', 'reading'];
+                    parts.forEach(p => {
+                        if (h[`${p} Score`] !== undefined && h[`${p}Score`] === undefined) {
+                            h[`${p}Score`] = h[`${p} Score`];
+                        }
+                        if (h[`${p} AudioUrl`] !== undefined && h[`${h}AudioUrl`] === undefined) {
+                            h[`${p}AudioUrl`] = h[`${p} AudioUrl`];
+                        }
+                    });
+                    return h;
+                });
+            }
+            return s;
+        });
+
+        return cleanupAndDedupe(processed);
     } catch (e) {
         console.error("Failed to load students", e);
         return [];

@@ -8,7 +8,7 @@ import { Mic, Square, RefreshCcw, Volume2, ArrowLeft, Award, AlertCircle, Messag
 import { GeminiFeedbackSchema, Lesson } from '../types';
 import { ACHIEVEMENTS, Achievement } from './achievements';
 import { saveCommunication } from '../services/communicationService';
-import { saveStudentResult, getStudents } from '../services/studentService';
+import { saveStudentResult, getStudents, syncWithServer } from '../services/studentService';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 
@@ -816,7 +816,7 @@ export const ReadingPractice: React.FC = () => {
     const formData = new FormData();
     const ext = supportedMimeType.includes('mp4') ? 'mp4' : 'webm';
     // Create a unique filename using text and timestamp to prevent overwriting
-    const fileName = `submission_${currentStudentId}_w${lesson.week}_${part}_${Date.now()}.${ext} `;
+    const fileName = `submission_${currentStudentId}_w${lesson.week}_${part}_${Date.now()}.${ext}`;
 
     formData.append('audioFile', blob, fileName);
     formData.append('studentId', currentStudentId);
@@ -862,7 +862,7 @@ export const ReadingPractice: React.FC = () => {
    * NOTE: `URL.createObjectURL` is temporary. For persistent storage, the blob
    * needs to be uploaded to a server, and the returned URL should be saved.
    */
-  const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined) => {
+  const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined): Promise<string | null> => {
     // GIỚI HẠN KÍCH THƯỚC LƯU TRỮ TẠM THỜI
     const MAX_BLOB_SIZE_FOR_BASE64 = 3 * 1024 * 1024; // 3MB
 
@@ -920,8 +920,8 @@ export const ReadingPractice: React.FC = () => {
     const student = allStudents[studentIndex];
     let historyRecord = student.history.find(h => h.week === lesson.week);
 
-    const partScoreKey = `${part} Score`;
-    const partAudioKey = `${part} AudioUrl`;
+    const partScoreKey = `${part}Score`;
+    const partAudioKey = `${part}AudioUrl`;
 
     if (historyRecord) {
       // Cập nhật bản ghi đã có
@@ -959,9 +959,10 @@ export const ReadingPractice: React.FC = () => {
     } catch (e) {
       console.error("LỖI LƯU VÀO LOCALSTORAGE:", e);
       // Đây là lỗi nghiêm trọng, có thể do localStorage đầy.
-      setNotification({ message: 'Lỗi nghiêm trọng: Không thể lưu bài làm! Có thể do bộ nhớ trình duyệt đã đầy.', type: 'error' });
+      setNotification({ message: 'Lỗi nghiêm trọng: Không thể lưu bài làm! Có thể do bộ bộ nhớ trình duyệt đã đầy.', type: 'error' });
       // Trong trường hợp này, không dispatch event để tránh UI bị cập nhật sai.
     }
+    return audioUrlToSave;
   };
 
   const handleEvaluate = async (overrideTargetText?: string, overrideAudioBlob?: Blob) => {
