@@ -35,7 +35,7 @@ export const TeacherDashboard: React.FC = () => {
   // Week Selector State
   // Lesson Data for Weeks
   const [allLessons, setAllLessons] = useState<Lesson[]>(DEFAULT_LESSONS);
-  const [selectedWeek, setSelectedWeek] = useState<number>(18);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1); // Default to week 1, will update in useEffect
 
   // Dynamic Weeks based on actual lessons
   const weeks = useMemo(() => {
@@ -46,6 +46,16 @@ export const TeacherDashboard: React.FC = () => {
       .filter((w): w is number => typeof w === 'number' && !isNaN(w));
     return Array.from(new Set(validWeeks)).sort((a: number, b: number) => b - a);
   }, [allLessons]);
+
+  // Set default week when lessons are loaded (pick the latest week)
+  useEffect(() => {
+    if (weeks.length > 0) {
+      // If current week is 1 (initial) or not in list, pick the latest one (sorted b-a, so weeks[0])
+      if (selectedWeek === 1 || !weeks.includes(selectedWeek)) {
+        setSelectedWeek(weeks[0]);
+      }
+    }
+  }, [weeks]);
 
   // Fetch Lessons and Classes on mount
   useEffect(() => {

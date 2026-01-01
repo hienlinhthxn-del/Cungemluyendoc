@@ -42,6 +42,7 @@ import ClassModel from './Class.js';
 import Communication from './models/Communication.js';
 import authRoutes from './routes/authRoutes.js';
 import LessonAudio from './models/LessonAudio.js';
+import { DEFAULT_LESSONS } from './data/defaultLessons.js';
 
 // JWT_SECRET is accessed via process.env where needed to ensure latest value
 const JWT_SECRET = () => process.env.JWT_SECRET || 'your_jwt_secret_key_here';
@@ -147,6 +148,29 @@ const loadDBFromCloud = async () => {
     }
 };
 
+const seedDefaultLessons = async () => {
+    try {
+        const count = await Lesson.countDocuments({ teacherId: null });
+        if (count < DEFAULT_LESSONS.length) {
+            console.log(`🌱 Database has ${count}/${DEFAULT_LESSONS.length} default lessons. Checking for missing ones...`);
+
+            for (const defaultLesson of DEFAULT_LESSONS) {
+                const existing = await Lesson.findOne({ id: defaultLesson.id, teacherId: null });
+                if (!existing) {
+                    const newLesson = new Lesson({ ...defaultLesson, teacherId: null });
+                    await newLesson.save();
+                    console.log(`   + Added missing lesson: ${defaultLesson.id}`);
+                }
+            }
+            console.log("✅ Seeding check complete.");
+        } else {
+            console.log(`📊 Found ${count} existing default lessons. Skipping seed.`);
+        }
+    } catch (e) {
+        console.error("❌ Seeding failed:", e.message);
+    }
+};
+
 const connectDB = async () => {
     try {
         const uri = process.env.MONGODB_URI;
@@ -174,6 +198,9 @@ const connectDB = async () => {
 
             await mongoose.connect(uri, options);
             // Trình theo dõi sự kiện 'connected' bây giờ sẽ ghi lại thông báo thành công.
+
+            // --- SEED DATA ---
+            await seedDefaultLessons();
         } else {
             console.warn("⚠️ MONGODB_URI missing. ACTIVATING CLOUDINARY-DB MODE.");
             // If Cloudinary configured, try to load data

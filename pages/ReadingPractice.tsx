@@ -9,6 +9,7 @@ import { GeminiFeedbackSchema, Lesson } from '../types';
 import { ACHIEVEMENTS, Achievement } from './achievements';
 import { saveCommunication } from '../services/communicationService';
 import { saveStudentResult, getStudents } from '../services/studentService';
+import { useAuth } from '../context/AuthContext';
 
 const READING_LIMIT_SECONDS = 900; // 15 minutes
 const QUIZ_LIMIT_SECONDS = 300; // 5 minutes
@@ -16,6 +17,7 @@ const QUIZ_LIMIT_SECONDS = 300; // 5 minutes
 export const ReadingPractice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { token: authToken } = useAuth();
 
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [isLoadingLesson, setIsLoadingLesson] = useState(true);
@@ -274,15 +276,20 @@ export const ReadingPractice: React.FC = () => {
     const fetchCustomAudio = async () => {
       if (!lesson?.id) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = authToken || localStorage.getItem('token');
         const classId = localStorage.getItem('student_class_id');
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
+        console.log(`[FETCH_AUDIO] Fetching for lesson: ${lesson.id}, hasToken: ${!!token}`);
+
         const url = `/api/lessons/${lesson.id}/custom-audio${classId ? `?classId=${classId}` : ''}`;
         const response = await fetch(url, { headers });
 
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) {
+          console.error(`[FETCH_AUDIO] Error: ${response.status} ${response.statusText}`);
+          throw new Error('Network response was not ok');
+        }
         const data: Record<string, string> = await response.json();
         setCustomVoiceMap(data);
       } catch (error) {
@@ -505,8 +512,11 @@ export const ReadingPractice: React.FC = () => {
 
     setIsUploading(text); // Set uploading state for UI feedback
 
-    const token = localStorage.getItem('token');
+    const token = authToken || localStorage.getItem('token');
+    console.log(`[UPLOAD_AUDIO] Starting upload. text: ${text}, hasToken: ${!!token}`);
+
     if (!token) {
+      console.warn("[UPLOAD_AUDIO] No token found in AuthContext or LocalStorage");
       setNotification({ message: 'Lỗi: Bạn chưa đăng nhập hoặc phiên làm việc hết hạn. Vui lòng đăng nhập lại.', type: 'error' });
       playError();
       return;
@@ -523,17 +533,18 @@ export const ReadingPractice: React.FC = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || errorData.error || "Server Error");
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`[UPLOAD_AUDIO] Server returned ${response.status}:`, errorData);
+        throw new Error(errorData.details || errorData.error || `Server Error (${response.status})`);
       }
 
       const data = await response.json();
+      console.log("[UPLOAD_AUDIO] Upload success:", data.audioUrl);
       setCustomVoiceMap(prev => ({ ...prev, [text]: data.audioUrl }));
       setNotification({ message: 'Đã lưu giọng đọc mẫu thành công! Bạn có thể nghe lại ngay.', type: 'success' });
       playSuccess();
     } catch (error) {
-      console.error("Upload failed:", error);
-      console.error("Upload failed details:", error);
+      console.error("[UPLOAD_AUDIO] Exception:", error);
       alert(`Tải lên thất bại: ${error instanceof Error ? error.message : "Lỗi không xác định"}`);
       playError();
     } finally {
