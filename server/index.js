@@ -547,18 +547,16 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
     }
 
     let audioUrl;
-    if (process.env.CLOUDINARY_CLOUD_NAME && audioFile.path && audioFile.path.includes('reading-app-audio')) {
-        // If Cloudinary is configured, and path contains our folder, ensure it's a full URL
-        if (audioFile.path.startsWith('http')) {
-            audioUrl = audioFile.path.replace('http:', 'https:');
-        } else {
-            // It's a relative Cloudinary path, fix it
-            audioUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/${audioFile.path}`;
-        }
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+
+    if (audioFile.path && (audioFile.path.startsWith('http') || audioFile.path.startsWith('https'))) {
+        audioUrl = audioFile.path.replace('http:', 'https:');
     } else if (audioFile.secure_url) {
         audioUrl = audioFile.secure_url.replace('http:', 'https:');
-    } else if (audioFile.path && audioFile.path.startsWith('http')) {
-        audioUrl = audioFile.path.replace('http:', 'https:');
+    } else if (cloudName && (audioFile.path?.includes('reading-app-audio') || audioFile.filename?.includes('reading-app-audio'))) {
+        // If it's Cloudinary (relative path or filename), fix it
+        const path = (audioFile.path || audioFile.filename).replace(/^\/uploads\//, '');
+        audioUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${path}`;
     } else {
         // Local Disk Storage fallback
         audioUrl = `/uploads/${audioFile.filename}`;

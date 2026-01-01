@@ -177,7 +177,11 @@ export const ParentDashboard: React.FC = () => {
 
     // Safety check: Fix malformed URLs on the fly
     let sanitizedUrl = url;
-    if (url.startsWith('/uploads/http')) {
+    if (url.includes('reading-app-audio') && !url.startsWith('http')) {
+      // Fix relative Cloudinary path
+      const path = url.replace(/^\/uploads\//, '');
+      sanitizedUrl = `https://res.cloudinary.com/hienlinhthxn/video/upload/${path}`;
+    } else if (url.startsWith('/uploads/http')) {
       sanitizedUrl = url.replace(/^\/uploads\//, '');
     }
     // Ensure https for Cloudinary

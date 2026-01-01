@@ -153,18 +153,16 @@ export default (uploadMiddleware, LessonAudio) => {
             if (!req.file) return res.status(400).json({ error: 'No audio file received' });
 
             let audioUrl;
-            if (process.env.CLOUDINARY_CLOUD_NAME && req.file.path && req.file.path.includes('reading-app-audio')) {
-                // If Cloudinary is configured, and path contains our folder, ensure it's a full URL
-                if (req.file.path.startsWith('http')) {
-                    audioUrl = req.file.path.replace('http:', 'https:');
-                } else {
-                    // It's a relative Cloudinary path, fix it
-                    audioUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/${req.file.path}`;
-                }
+            const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+
+            if (req.file.path && (req.file.path.startsWith('http') || req.file.path.startsWith('https'))) {
+                audioUrl = req.file.path.replace('http:', 'https:');
             } else if (req.file.secure_url) {
                 audioUrl = req.file.secure_url.replace('http:', 'https:');
-            } else if (req.file.path && req.file.path.startsWith('http')) {
-                audioUrl = req.file.path.replace('http:', 'https:');
+            } else if (cloudName && (req.file.path?.includes('reading-app-audio') || req.file.filename?.includes('reading-app-audio'))) {
+                // If it's Cloudinary (relative path or filename), fix it
+                const path = (req.file.path || req.file.filename).replace(/^\/uploads\//, '');
+                audioUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${path}`;
             } else {
                 audioUrl = `/uploads/${req.file.filename}`;
             }
