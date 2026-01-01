@@ -213,15 +213,36 @@ const connectDB = async () => {
 
             // --- DATA CLEANUP: Fix malformed URLs (one-time) ---
             try {
-                console.log("🛠️ Checking for malformed audio URLs (/uploads/http...)...");
+                const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+                console.log("🛠️ Checking for malformed audio URLs...");
+
+                const fixUrl = (url) => {
+                    if (!url) return url;
+                    // Case 1: /uploads/http... (already handled but keep for safety)
+                    if (url.startsWith('/uploads/http')) {
+                        return url.replace(/^\/uploads\//, '').replace('http:', 'https:');
+                    }
+                    // Case 2: /uploads/reading-app-audio/... (The current culprit)
+                    if (url.startsWith('/uploads/reading-app-audio/') && cloudName) {
+                        const path = url.replace(/^\/uploads\//, '');
+                        return `https://res.cloudinary.com/${cloudName}/video/upload/${path}`;
+                    }
+                    return url;
+                };
 
                 // 1. Fix LessonAudio
-                const badAudios = await LessonAudio.find({ audioUrl: { $regex: /^\/uploads\/http/ } });
+                const badAudios = await LessonAudio.find({
+                    $or: [
+                        { audioUrl: { $regex: /^\/uploads\/http/ } },
+                        { audioUrl: { $regex: /^\/uploads\/reading-app-audio/ } }
+                    ]
+                });
                 if (badAudios.length > 0) {
                     console.log(`   - Found ${badAudios.length} malformed LessonAudio URLs. Fixing...`);
                     for (const doc of badAudios) {
-                        doc.audioUrl = doc.audioUrl.replace(/^\/uploads\//, '').replace('http:', 'https:');
-                        await doc.save();
+                        const old = doc.audioUrl;
+                        doc.audioUrl = fixUrl(doc.audioUrl);
+                        if (old !== doc.audioUrl) await doc.save();
                     }
                 }
 
@@ -230,10 +251,10 @@ const connectDB = async () => {
                     "history": {
                         $elemMatch: {
                             $or: [
-                                { audioUrl: { $regex: /^\/uploads\/http/ } },
-                                { phonemeAudioUrl: { $regex: /^\/uploads\/http/ } },
-                                { wordAudioUrl: { $regex: /^\/uploads\/http/ } },
-                                { readingAudioUrl: { $regex: /^\/uploads\/http/ } }
+                                { audioUrl: { $regex: /^\/uploads\/(http|reading-app-audio)/ } },
+                                { phonemeAudioUrl: { $regex: /^\/uploads\/(http|reading-app-audio)/ } },
+                                { wordAudioUrl: { $regex: /^\/uploads\/(http|reading-app-audio)/ } },
+                                { readingAudioUrl: { $regex: /^\/uploads\/(http|reading-app-audio)/ } }
                             ]
                         }
                     }
@@ -246,10 +267,9 @@ const connectDB = async () => {
                         student.history = student.history.map(h => {
                             const fields = ['audioUrl', 'phonemeAudioUrl', 'wordAudioUrl', 'readingAudioUrl'];
                             fields.forEach(f => {
-                                if (h[f] && h[f].startsWith('/uploads/http')) {
-                                    h[f] = h[f].replace(/^\/uploads\//, '').replace('http:', 'https:');
-                                    changed = true;
-                                }
+                                const old = h[f];
+                                h[f] = fixUrl(h[f]);
+                                if (old !== h[f]) changed = true;
                             });
                             return h;
                         });
@@ -527,15 +547,24 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
     }
 
     let audioUrl;
-    if (audioFile.path && (audioFile.path.startsWith('http') || audioFile.path.startsWith('https'))) {
-        // Cloudinary storage usually puts the URL in 'path' or 'secure_url'
-        audioUrl = audioFile.path.replace('http:', 'https:');
+    if (process.env.CLOUDINARY_CLOUD_NAME && audioFile.path && audioFile.path.includes('reading-app-audio')) {
+        // If Cloudinary is configured, and path contains our folder, ensure it's a full URL
+        if (audioFile.path.startsWith('http')) {
+            audioUrl = audioFile.path.replace('http:', 'https:');
+        } else {
+            // It's a relative Cloudinary path, fix it
+            audioUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/${audioFile.path}`;
+        }
     } else if (audioFile.secure_url) {
         audioUrl = audioFile.secure_url.replace('http:', 'https:');
+    } else if (audioFile.path && audioFile.path.startsWith('http')) {
+        audioUrl = audioFile.path.replace('http:', 'https:');
     } else {
         // Local Disk Storage fallback
         audioUrl = `/uploads/${audioFile.filename}`;
     }
+
+    console.log(`[SUBMISSION] Final Audio URL: ${audioUrl}`);
 
     // --- DEBUGGING STEP: Log the connection state right before use ---
     console.log(`[SUBMISSION] API called. Checking DB connection state...`);

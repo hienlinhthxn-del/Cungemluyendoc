@@ -623,7 +623,12 @@ export const ReadingPractice: React.FC = () => {
     let sanitizedUrl = url;
     if (url.startsWith('/uploads/http')) {
       sanitizedUrl = url.replace(/^\/uploads\//, '');
+    } else if (url.startsWith('/uploads/reading-app-audio/')) {
+      // Fix relative Cloudinary path
+      const path = url.replace(/^\/uploads\//, '');
+      sanitizedUrl = `https://res.cloudinary.com/hienlinhthxn/video/upload/${path}`;
     }
+
     // Ensure https for Cloudinary
     if (sanitizedUrl.startsWith('http:')) {
       sanitizedUrl = sanitizedUrl.replace('http:', 'https:');

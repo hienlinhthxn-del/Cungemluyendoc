@@ -153,10 +153,18 @@ export default (uploadMiddleware, LessonAudio) => {
             if (!req.file) return res.status(400).json({ error: 'No audio file received' });
 
             let audioUrl;
-            if (req.file.path && (req.file.path.startsWith('http') || req.file.path.startsWith('https'))) {
-                audioUrl = req.file.path.replace('http:', 'https:');
+            if (process.env.CLOUDINARY_CLOUD_NAME && req.file.path && req.file.path.includes('reading-app-audio')) {
+                // If Cloudinary is configured, and path contains our folder, ensure it's a full URL
+                if (req.file.path.startsWith('http')) {
+                    audioUrl = req.file.path.replace('http:', 'https:');
+                } else {
+                    // It's a relative Cloudinary path, fix it
+                    audioUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/${req.file.path}`;
+                }
             } else if (req.file.secure_url) {
                 audioUrl = req.file.secure_url.replace('http:', 'https:');
+            } else if (req.file.path && req.file.path.startsWith('http')) {
+                audioUrl = req.file.path.replace('http:', 'https:');
             } else {
                 audioUrl = `/uploads/${req.file.filename}`;
             }
