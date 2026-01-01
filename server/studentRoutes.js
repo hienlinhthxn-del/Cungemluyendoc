@@ -24,7 +24,8 @@ export default (localStudents, saveDBToCloud, localClasses) => {
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) return null;
         try {
-            return jwt.verify(token, JWT_SECRET);
+            const secret = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+            return jwt.verify(token, secret);
         } catch (e) {
             return null;
         }

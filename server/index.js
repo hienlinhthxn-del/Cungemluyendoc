@@ -44,8 +44,8 @@ import authRoutes from './routes/authRoutes.js';
 import LessonAudio from './models/LessonAudio.js';
 import { DEFAULT_LESSONS } from './data/defaultLessons.js';
 
-// JWT_SECRET is accessed via process.env where needed to ensure latest value
-const JWT_SECRET = () => process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+// JWT_SECRET is accessed via this helper to ensure we always get the latest env value
+const getJwtSecret = () => process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
 // Setup paths for ES Module
 const __filename = fileURLToPath(import.meta.url);
@@ -461,12 +461,13 @@ app.post('/api/submissions', uploadMiddleware, async (req, res) => {
     }
 
     let audioUrl;
-    if (audioFile.secure_url) { // Cloudinary gives secure_url
-        audioUrl = audioFile.secure_url.startsWith('http:')
-            ? audioFile.secure_url.replace('http:', 'https:')
-            : audioFile.secure_url;
+    if (audioFile.path && (audioFile.path.startsWith('http') || audioFile.path.startsWith('https'))) {
+        // Cloudinary storage usually puts the URL in 'path' or 'secure_url'
+        audioUrl = audioFile.path.replace('http:', 'https:');
+    } else if (audioFile.secure_url) {
+        audioUrl = audioFile.secure_url.replace('http:', 'https:');
     } else {
-        // Local Disk Storage: Use relative path for browser access
+        // Local Disk Storage fallback
         audioUrl = `/uploads/${audioFile.filename}`;
     }
 

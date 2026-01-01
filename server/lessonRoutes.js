@@ -150,7 +150,9 @@ export default (uploadMiddleware, LessonAudio) => {
             if (!req.file) return res.status(400).json({ error: 'No audio file received' });
 
             let audioUrl;
-            if (req.file.secure_url) {
+            if (req.file.path && (req.file.path.startsWith('http') || req.file.path.startsWith('https'))) {
+                audioUrl = req.file.path.replace('http:', 'https:');
+            } else if (req.file.secure_url) {
                 audioUrl = req.file.secure_url.replace('http:', 'https:');
             } else {
                 audioUrl = `/uploads/${req.file.filename}`;
