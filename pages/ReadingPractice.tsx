@@ -280,6 +280,7 @@ export const ReadingPractice: React.FC = () => {
       try {
         const token = authToken || localStorage.getItem('token');
         const classId = localStorage.getItem('student_class_id');
+        console.log(`[DEBUG_AUDIO] Fetching for lesson: ${lesson.id}, classId: "${classId}", token: ${!!token}`);
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -863,6 +864,7 @@ export const ReadingPractice: React.FC = () => {
    * needs to be uploaded to a server, and the returned URL should be saved.
    */
   const savePartialStudentResult = async (part: 'phoneme' | 'word' | 'reading', score: number, readingSpeed: number, audioBlob: Blob | undefined): Promise<string | null> => {
+    console.log(`[DEBUG_SCORE] Saving part: ${part}, Score: ${score}, Speed: ${readingSpeed}, HasBlob: ${!!audioBlob}`);
     // GIỚI HẠN KÍCH THƯỚC LƯU TRỮ TẠM THỜI
     const MAX_BLOB_SIZE_FOR_BASE64 = 3 * 1024 * 1024; // 3MB
 
