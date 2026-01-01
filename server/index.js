@@ -775,8 +775,8 @@ if (isProduction && !fs.existsSync(distPath)) {
 if (fs.existsSync(distPath)) { // This will be true in production (due to the check above) or if built locally.
     console.log("✅ Serving frontend from:", distPath);
     app.use(express.static(distPath));
-    // SPA Fallback for all non-API routes, allowing client-side routing to take over.
-    app.get(/^(?!\/api\/).*$/, (req, res) => {
+    // SPA Fallback: Serve index.html for any route that is NOT /api/ and NOT /uploads/
+    app.get(/^(?!\/(api|uploads)\/).*$/, (req, res) => {
         res.sendFile(path.join(distPath, 'index.html'));
     });
 } else {
