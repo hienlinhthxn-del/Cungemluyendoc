@@ -151,21 +151,17 @@ const loadDBFromCloud = async () => {
 const seedDefaultLessons = async () => {
     try {
         const count = await Lesson.countDocuments({ teacherId: null });
-        if (count < DEFAULT_LESSONS.length) {
-            console.log(`🌱 Database has ${count}/${DEFAULT_LESSONS.length} default lessons. Checking for missing ones...`);
+        console.log(`🌱 Checking database lessons (Global count: ${count})...`);
 
-            for (const defaultLesson of DEFAULT_LESSONS) {
-                const existing = await Lesson.findOne({ id: defaultLesson.id, teacherId: null });
-                if (!existing) {
-                    const newLesson = new Lesson({ ...defaultLesson, teacherId: null });
-                    await newLesson.save();
-                    console.log(`   + Added missing lesson: ${defaultLesson.id}`);
-                }
+        for (const defaultLesson of DEFAULT_LESSONS) {
+            const existing = await Lesson.findOne({ id: defaultLesson.id, teacherId: null });
+            if (!existing) {
+                const newLesson = new Lesson({ ...defaultLesson, teacherId: null });
+                await newLesson.save();
+                console.log(`   + Added missing lesson: ${defaultLesson.id} (Week ${defaultLesson.week})`);
             }
-            console.log("✅ Seeding check complete.");
-        } else {
-            console.log(`📊 Found ${count} existing default lessons. Skipping seed.`);
         }
+        console.log("✅ Seeding check complete.");
     } catch (e) {
         console.error("❌ Seeding failed:", e.message);
     }
