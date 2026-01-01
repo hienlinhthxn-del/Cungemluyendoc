@@ -197,6 +197,19 @@ const connectDB = async () => {
 
             // --- SEED DATA ---
             await seedDefaultLessons();
+
+            // --- INDEX CLEANUP (One-time for multi-tenancy migration) ---
+            try {
+                // Check if the old 'id_1' index exists and drop it
+                const indexes = await Lesson.collection.indexes();
+                const hasOldIndex = indexes.some(idx => idx.name === 'id_1' || (idx.key.id === 1 && Object.keys(idx.key).length === 1));
+                if (hasOldIndex) {
+                    console.log("🧹 Dropping old 'id_1' unique index to support multi-tenancy...");
+                    await Lesson.collection.dropIndex('id_1').catch(e => console.log("   (Index id_1 might have already been dropped or named differently)"));
+                }
+            } catch (e) {
+                console.warn("⚠️ Could not cleanup legacy indexes:", e.message);
+            }
         } else {
             console.warn("⚠️ MONGODB_URI missing. ACTIVATING CLOUDINARY-DB MODE.");
             // If Cloudinary configured, try to load data
