@@ -145,9 +145,18 @@ export const evaluateReading = async (
   };
 
   // 3. ROBUST EXECUTION WITH FALLBACK
-  const modelsToTry = [selectedModel, 'gemini-1.5-flash-001', 'gemini-1.5-pro-001', 'gemini-1.0-pro', 'gemini-2.0-flash-exp'];
+  const modelsToTry = [
+    'gemini-2.0-flash-exp', // Try the newest first (it worked before until limit)
+    'gemini-1.5-flash',     // Generic alias (usually points to 001 or 002)
+    'gemini-1.5-flash-001', // Backup versioned
+    'gemini-1.5-flash-8b',  // Smaller, faster model
+    'gemini-1.5-pro',
+    'gemini-1.0-pro'
+  ];
   // Deduplicate models
   const uniqueModels = [...new Set(modelsToTry)];
+
+  let lastErrorMsg = "";
 
   for (const model of uniqueModels) {
     try {
@@ -163,6 +172,9 @@ export const evaluateReading = async (
       };
 
     } catch (error: any) {
+      // Capture the message for final reporting
+      lastErrorMsg = `${model} Error: ${error.message}`;
+
       const is429 = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
       console.warn(`Attempt with ${model} failed (Is 429: ${is429}):`, error.message);
 
@@ -171,6 +183,6 @@ export const evaluateReading = async (
     }
   }
 
-  throw new Error(`All models failed. Last error: ${discoveryLog}`);
+  throw new Error(`All models failed. Last error: ${lastErrorMsg || discoveryLog}`);
 
 };
