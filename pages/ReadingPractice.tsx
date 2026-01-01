@@ -274,7 +274,7 @@ export const ReadingPractice: React.FC = () => {
     const fetchCustomAudio = async () => {
       if (!lesson?.id) return;
       try {
-        const token = localStorage.getItem('teacher_token');
+        const token = localStorage.getItem('token');
         const classId = localStorage.getItem('student_class_id');
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -506,7 +506,7 @@ export const ReadingPractice: React.FC = () => {
     setIsUploading(text); // Set uploading state for UI feedback
 
     try {
-      const token = localStorage.getItem('teacher_token');
+      const token = localStorage.getItem('token');
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
