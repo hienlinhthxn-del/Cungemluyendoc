@@ -91,7 +91,8 @@ export const evaluateReading = async (
   const apiKey = getApiKey();
 
   if (!apiKey) {
-    return new Promise((resolve) => setTimeout(() => resolve(getMockResponse(userSpokenText, "Missing API Key")), 1500));
+    console.error("❌ MISSING API KEY: VITE_GEMINI_API_KEY is not set.");
+    return new Promise((resolve) => setTimeout(() => resolve(getMockResponse(userSpokenText, "Lỗi server: Thiếu API Key (VITE_GEMINI_API_KEY). Vui lòng báo giáo viên hoặc admin kiểm tra cấu hình.")), 1500));
   }
 
   // STEP 1: Discover Valid Models

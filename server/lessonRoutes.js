@@ -146,7 +146,8 @@ export default (uploadMiddleware, LessonAudio) => {
                 console.log(`[GET_AUDIO] Final Query: ${JSON.stringify(query)}`);
                 // Sort so that items with specific teacherId come LAST (so they overwrite null/empty ones in the reduce)
                 const audios = await LessonAudio.find(query).sort({ teacherId: 1 });
-                console.log(`[GET_AUDIO] Found ${audios.length} recordings in DB.`);
+                console.log(`[GET_AUDIO] Found ${audios.length} recordings. TeacherID used: ${teacherId}`);
+                audios.forEach(a => console.log(` - [${a.text}] tid=${a.teacherId} url=${a.audioUrl.slice(-20)}`));
 
                 // Log first few result URLs for debugging
                 if (audios.length > 0) {
