@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
@@ -41,6 +42,8 @@ import authRoutes from './routes/authRoutes.js';
 if (fs.existsSync('.env')) {
     dotenv.config();
 }
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
 // Setup paths for ES Module
 const __filename = fileURLToPath(import.meta.url);
@@ -597,10 +600,11 @@ app.get('/api/lessons/:lessonId/custom-audio', async (req, res) => {
         if (authHeader && authHeader.startsWith('Bearer ')) {
             try {
                 const token = authHeader.split(' ')[1];
-                const jwt = (await import('jsonwebtoken')).default;
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+                const decoded = jwt.verify(token, JWT_SECRET);
                 teacherId = decoded.id;
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                console.error("Fetch Audio Auth Error:", e.message);
+            }
         } else if (classId && mongoose.connection.readyState === 1) {
             const cls = await ClassModel.findOne({ id: classId });
             if (cls) teacherId = cls.teacherId;
