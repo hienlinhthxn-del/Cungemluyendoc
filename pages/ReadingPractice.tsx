@@ -618,16 +618,31 @@ export const ReadingPractice: React.FC = () => {
 
   const playAudio = (url: string) => {
     if (!audioPlayerRef.current) return;
-    audioPlayerRef.current.src = url;
-    audioPlayerRef.current.onended = () => setPlayingSection(null);
+
+    // Add timestamp to bypass potential browser caching of failed requests
+    const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`;
+
+    console.log(`[PLAY_AUDIO] Attempting to play: ${audioUrl}`);
+
+    audioPlayerRef.current.src = audioUrl;
+    audioPlayerRef.current.onended = () => {
+      console.log("[PLAY_AUDIO] Playback ended normally");
+      setPlayingSection(null);
+    };
     audioPlayerRef.current.onerror = (e) => {
       setPlayingSection(null);
-      console.error("Audio playback error:", e);
-      // Optionally, show a user-facing error message
+      console.error("[PLAY_AUDIO] Error event:", e);
+      const audioError = audioPlayerRef.current?.error;
+      console.error(`[PLAY_AUDIO] Audio Error Details - Code: ${audioError?.code}, Message: ${audioError?.message}`);
+
+      if (audioError?.code === 4) {
+        alert("Lỗi: Không tìm thấy tệp âm thanh hoặc định dạng không hỗ trợ trên trình duyệt này. Thầy/Cô vui lòng thử ghi âm lại hoặc sử dụng Google Chrome.");
+      }
     };
+
     audioPlayerRef.current.play().catch(e => {
       setPlayingSection(null);
-      console.error("Audio play() failed:", e);
+      console.error("[PLAY_AUDIO] play() promise failed:", e);
     });
   };
 

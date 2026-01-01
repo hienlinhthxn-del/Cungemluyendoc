@@ -120,10 +120,13 @@ export default (uploadMiddleware, LessonAudio) => {
             }
 
             if (mongoose.connection.readyState === 1) {
-                const audios = await LessonAudio.find({
+                const query = {
                     lessonId,
                     $or: [{ teacherId: null }, { teacherId }]
-                });
+                };
+                console.log(`[GET_AUDIO] Querying MongoDB - Lesson: ${lessonId}, Teacher: ${teacherId}`);
+                const audios = await LessonAudio.find(query);
+                console.log(`[GET_AUDIO] Found ${audios.length} recordings.`);
                 const audioMap = audios.reduce((acc, curr) => {
                     acc[curr.text || ""] = curr.audioUrl;
                     return acc;
@@ -154,13 +157,16 @@ export default (uploadMiddleware, LessonAudio) => {
             }
 
             if (mongoose.connection.readyState === 1) {
-                await LessonAudio.findOneAndUpdate(
+                console.log(`[POST_AUDIO] Saving to MongoDB - Lesson: ${lessonId}, Text: ${text}, Teacher: ${teacherId}`);
+                const saved = await LessonAudio.findOneAndUpdate(
                     { lessonId, text, teacherId },
                     { audioUrl },
                     { upsert: true, new: true }
                 );
+                console.log(`[POST_AUDIO] Save result: ${!!saved}`);
             }
 
+            console.log(`[POST_AUDIO] Returning URL: ${audioUrl}`);
             res.json({ audioUrl, text });
         } catch (error) {
             res.status(500).json({ error: 'Upload failed', details: error.message });
