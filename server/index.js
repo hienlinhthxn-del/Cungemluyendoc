@@ -559,35 +559,24 @@ app.get('/api/health', (req, res) => {
 // Submissions and Communications routes remain in index.js for now.
 // Custom lesson audio routes have been refactored into lessonRoutes.js.
 
-// --- DEBUG ROUTE: Check Cloudinary Connection ---
-app.get('/api/test-cloudinary', async (req, res) => {
+// --- 4. DEBUG UTILS ---
+app.get('/api/debug-files', (req, res) => {
     try {
-        if (!process.env.CLOUDINARY_CLOUD_NAME) {
-            return res.json({
-                status: 'local_mode',
-                message: 'Cloudinary not configured (Local Mode)',
-                env: {
-                    cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
-                    api_key: !!process.env.CLOUDINARY_API_KEY,
-                    api_secret: !!process.env.CLOUDINARY_API_SECRET
-                }
-            });
+        const uploadDir = path.join(__dirname, 'uploads');
+        const exists = fs.existsSync(uploadDir);
+        let files = [];
+        if (exists) {
+            files = fs.readdirSync(uploadDir);
         }
-
-        // Try to ping Cloudinary by verifying credentials
-        const result = await cloudinary.api.ping();
         res.json({
-            status: 'success',
-            message: 'Cloudinary Connected Successfully!',
-            details: result
+            uploadDir,
+            exists,
+            node_env: process.env.NODE_ENV,
+            __dirname,
+            files: files.slice(-20) // show last 20 files
         });
-    } catch (error) {
-        console.error("Cloudinary Test Error:", error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Cloudinary Connection Failed',
-            error: error.message
-        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
