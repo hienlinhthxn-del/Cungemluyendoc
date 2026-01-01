@@ -161,7 +161,7 @@ export const evaluateReading = async (
   };
 
   // 3. ROBUST EXECUTION WITH FALLBACK
-  const modelsToTry = [selectedModel, 'gemini-1.5-flash-001', 'gemini-1.5-pro-001', 'gemini-1.0-pro'];
+  const modelsToTry = [selectedModel, 'gemini-1.5-flash-001', 'gemini-1.5-pro-001', 'gemini-1.0-pro', 'gemini-2.0-flash-exp'];
   // Deduplicate models
   const uniqueModels = [...new Set(modelsToTry)];
 
@@ -182,15 +182,8 @@ export const evaluateReading = async (
       const is429 = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
       console.warn(`Attempt with ${model} failed (Is 429: ${is429}):`, error.message);
 
-      // If it's NOT a 429/overload and NOT a 503/server error, it might be a bad request (400), so stop.
-      // But for safety, we try the next model if it's strictly a capacity/availability issue.
-      if (!is429 && !error.message?.includes('503') && !error.message?.includes('500') && !error.message?.includes('404') && !error.message?.includes('400')) {
-        // Actually, for this "Smart" version, we should try ALL models in the list regardless of error type,
-        // because "400 Bad Request" or "404 Not Found" usually means the MODEL NAME is wrong/deprecated.
-        // So we should just continue!
-        // throw error; // Don't retry for logic errors <--- DISABLED
-      }
-      // Otherwise, continue to next model in loop
+      // Continue to next model regardless of error type to be maximally robust
+      continue;
     }
   }
 

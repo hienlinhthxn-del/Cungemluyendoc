@@ -625,13 +625,15 @@ export const ReadingPractice: React.FC = () => {
     // Safety check: Fix malformed URLs on the fly
     let sanitizedUrl = url;
     if (url.includes('reading-app-audio') && !url.startsWith('http')) {
-      // Fix relative Cloudinary path (either starts with /uploads/ or just reading-app-audio/)
+      // Fix relative Cloudinary path
       const path = url.replace(/^\/uploads\//, '');
-      // We use 'hienlinhthxn' as default cloud name if we can't detect it, but we prefer full URLs from backend
       sanitizedUrl = `https://res.cloudinary.com/hienlinhthxn/video/upload/${path}`;
-      console.log(`[PLAY_AUDIO] Sanitized relative Cloudinary path: ${sanitizedUrl}`);
     } else if (url.startsWith('/uploads/http')) {
       sanitizedUrl = url.replace(/^\/uploads\//, '');
+    } else if (!url.startsWith('http') && !url.startsWith('/')) {
+      // Fix bare filenames (likely local uploads or legacy/mis-saved paths)
+      sanitizedUrl = `/uploads/${url}`;
+      console.log(`[PLAY_AUDIO] Fixed bare filename to: ${sanitizedUrl}`);
     }
 
     // Ensure https for Cloudinary
