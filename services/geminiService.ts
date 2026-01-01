@@ -107,13 +107,20 @@ export const evaluateReading = async (
     discoveryLog = `Found ${validModels.length} Valid Models: [${top3}...]`;
 
     if (validModels.length > 0) {
-      selectedModel = selectBestModel(validModels);
+      // Prioritize 1.5 Flash if available, as it's the most stable for v1beta currently
+      if (validModels.includes('gemini-1.5-flash')) {
+        selectedModel = 'gemini-1.5-flash';
+      } else {
+        selectedModel = selectBestModel(validModels);
+      }
       discoveryLog += ` -> Selected: ${selectedModel}`;
     } else {
-      discoveryLog += " -> No valid models found, defaulting.";
+      discoveryLog += " -> No valid models found, defaulting to gemini-1.5-flash.";
+      selectedModel = 'gemini-1.5-flash';
     }
   } catch (e) {
-    discoveryLog = "Discovery Failed";
+    discoveryLog = "Discovery Failed, defaulting to gemini-1.5-flash";
+    selectedModel = 'gemini-1.5-flash';
   }
 
   // STEP 2: Construct Payload

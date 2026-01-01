@@ -123,12 +123,18 @@ export default (uploadMiddleware, LessonAudio) => {
                     console.error(`[GET_AUDIO] Auth Token Error: ${e.message}`);
                 }
             } else if (classId && mongoose.connection.readyState === 1) {
-                const cls = await ClassModel.findOne({ id: classId });
+                // Fix: Trim classId and make it case-insensitive to be safe
+                const cleanClassId = classId.trim();
+                const cls = await ClassModel.findOne({ id: { $regex: new RegExp(`^${cleanClassId}$`, 'i') } });
+
                 if (cls) {
                     teacherId = cls.teacherId ? cls.teacherId.toString() : null;
                     console.log(`[GET_AUDIO] Identified Teacher via Class: ${teacherId} (Class: ${cls.name})`);
                 } else {
-                    console.warn(`[GET_AUDIO] Class not found: ${classId}`);
+                    console.warn(`[GET_AUDIO] Class not found: "${cleanClassId}" (Original: "${classId}")`);
+                    // Debug: List all available class IDs to help mismatch diagnosis
+                    const allClasses = await ClassModel.find({}, 'id');
+                    console.log(`[GET_AUDIO] Available Classes: ${allClasses.map(c => c.id).join(', ')}`);
                 }
             } else if (classId) {
                 console.warn(`[GET_AUDIO] MongoDB not connected, cannot lookup classId: ${classId}`);
