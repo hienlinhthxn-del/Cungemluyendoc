@@ -506,8 +506,13 @@ export const ReadingPractice: React.FC = () => {
     setIsUploading(text); // Set uploading state for UI feedback
 
     try {
+      const token = localStorage.getItem('teacher_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const response = await fetch(`/api/lessons/${lesson.id}/custom-audio`, {
         method: 'POST',
+        headers: headers,
         body: formData,
       });
 
