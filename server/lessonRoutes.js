@@ -125,7 +125,14 @@ export default (uploadMiddleware, LessonAudio) => {
             } else if (classId && mongoose.connection.readyState === 1) {
                 // Fix: Trim classId and make it case-insensitive to be safe
                 const cleanClassId = classId.trim();
-                const cls = await ClassModel.findOne({ id: { $regex: new RegExp(`^${cleanClassId}$`, 'i') } });
+                // SEARCH BY BOTH ID AND NAME (Case Insensitive) because students might enter "1A3" (Name) instead of the internal ID.
+                const regex = new RegExp(`^${cleanClassId}$`, 'i');
+                const cls = await ClassModel.findOne({
+                    $or: [
+                        { id: { $regex: regex } },
+                        { name: { $regex: regex } }
+                    ]
+                });
 
                 if (cls) {
                     teacherId = cls.teacherId ? cls.teacherId.toString() : null;
