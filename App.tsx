@@ -157,6 +157,7 @@ const AppContent: React.FC = () => {
               <Route path="/teacher/classes" element={<ClassManagerPage />} />
               <Route path="/teacher/reports" element={<ReportsPage />} />
               <Route path="/teacher/lost-and-found" element={<LostAndFoundPage onBack={() => window.history.back()} />} />
+              <Route path="/student/practice/:id" element={<ReadingPractice />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
             </>
           )}
