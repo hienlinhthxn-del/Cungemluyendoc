@@ -184,8 +184,11 @@ export const evaluateReading = async (
 
       // If it's NOT a 429/overload and NOT a 503/server error, it might be a bad request (400), so stop.
       // But for safety, we try the next model if it's strictly a capacity/availability issue.
-      if (!is429 && !error.message?.includes('503') && !error.message?.includes('500')) {
-        throw error; // Don't retry for logic errors
+      if (!is429 && !error.message?.includes('503') && !error.message?.includes('500') && !error.message?.includes('404') && !error.message?.includes('400')) {
+        // Actually, for this "Smart" version, we should try ALL models in the list regardless of error type,
+        // because "400 Bad Request" or "404 Not Found" usually means the MODEL NAME is wrong/deprecated.
+        // So we should just continue!
+        // throw error; // Don't retry for logic errors <--- DISABLED
       }
       // Otherwise, continue to next model in loop
     }

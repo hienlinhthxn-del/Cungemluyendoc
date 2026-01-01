@@ -140,6 +140,7 @@ export default (uploadMiddleware, LessonAudio) => {
                     $or: [
                         { teacherId: null },
                         { teacherId: teacherId },
+                        { teacherId: String(teacherId) }, // Explicit string check
                         { teacherId: "" } // Catch empty strings too
                     ]
                 };
