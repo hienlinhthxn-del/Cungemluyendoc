@@ -14,6 +14,7 @@ import dotenv from 'dotenv'; // Load env vars
 import studentRoutes from './studentRoutes.js';
 import lessonRoutes from './lessonRoutes.js';
 import classRoutes from './classRoutes.js';
+import authMiddleware from './middleware/authMiddleware.js';
 
 // --- GLOBAL ERROR HANDLERS ---
 // These should be at the top to catch errors early.
