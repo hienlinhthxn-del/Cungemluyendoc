@@ -160,21 +160,37 @@ export const evaluateReading = async (
     }
   };
 
-  try {
-    const data = await callGeminiRaw(selectedModel, payload, apiKey);
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  // 3. ROBUST EXECUTION WITH FALLBACK
+  const modelsToTry = [selectedModel, 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.0-pro'];
+  // Deduplicate models
+  const uniqueModels = [...new Set(modelsToTry)];
 
-    if (!text) throw new Error(`Empty response from ${selectedModel}`);
+  for (const model of uniqueModels) {
+    try {
+      const data = await callGeminiRaw(model, payload, apiKey);
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    const result = JSON.parse(text) as GeminiFeedbackSchema;
+      if (!text) throw new Error(`Empty response from ${model}`);
 
-    return {
-      ...result,
-      teacher_notes: `${result.teacher_notes} | [DEBUG: ${discoveryLog}]`
-    };
+      const result = JSON.parse(text) as GeminiFeedbackSchema;
+      return {
+        ...result,
+        teacher_notes: `${result.teacher_notes} | [Model: ${model}]`
+      };
 
-  } catch (error) {
-    console.error("REST Grading Error:", error);
-    return getMockResponse(userSpokenText, `${error instanceof Error ? error.message : String(error)} | ${discoveryLog}`);
+    } catch (error: any) {
+      const is429 = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
+      console.warn(`Attempt with ${model} failed (Is 429: ${is429}):`, error.message);
+
+      // If it's NOT a 429/overload and NOT a 503/server error, it might be a bad request (400), so stop.
+      // But for safety, we try the next model if it's strictly a capacity/availability issue.
+      if (!is429 && !error.message?.includes('503') && !error.message?.includes('500')) {
+        throw error; // Don't retry for logic errors
+      }
+      // Otherwise, continue to next model in loop
+    }
   }
+
+  throw new Error(`All models failed. Last error: ${discoveryLog}`);
+
 };
