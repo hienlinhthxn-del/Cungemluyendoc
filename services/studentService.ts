@@ -39,7 +39,7 @@ export const getStudents = (): StudentStats[] => {
                         if (h[`${p} Score`] !== undefined && h[`${p}Score`] === undefined) {
                             h[`${p}Score`] = h[`${p} Score`];
                         }
-                        if (h[`${p} AudioUrl`] !== undefined && h[`${h}AudioUrl`] === undefined) {
+                        if (h[`${p} AudioUrl`] !== undefined && h[`${p}AudioUrl`] === undefined) {
                             h[`${p}AudioUrl`] = h[`${p} AudioUrl`];
                         }
                     });
