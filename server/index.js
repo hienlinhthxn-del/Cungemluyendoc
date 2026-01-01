@@ -275,6 +275,7 @@ const uploadMiddleware = (req, res, next) => {
 // --- 4. DATA MODELS (Quick inline schema) ---
 const LessonAudioSchema = new mongoose.Schema({
     lessonId: String,
+    teacherId: { type: String, required: false, default: null }, // Link to a specific teacher
     text: String,
     audioUrl: String,
     createdAt: { type: Date, default: Date.now }
@@ -535,18 +536,17 @@ app.get('/api/health', (req, res) => {
 });
 
 // Upload Audio Route
-app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, res) => {
+app.post('/api/lessons/:lessonId/custom-audio', authMiddleware, uploadMiddleware, async (req, res) => {
     try {
-        console.log("📥 Upload Request Received for:", req.body.text);
-        console.log("📁 File info:", req.file);
-
-        if (!req.file) {
-            console.error("❌ No file in request");
-            return res.status(400).json({ error: 'No audio file received' });
-        }
-
         const { lessonId } = req.params;
         const { text } = req.body;
+        const teacherId = req.user.id;
+
+        console.log(`📥 Upload Request for: [${text}] by Teacher: ${teacherId}`);
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No audio file received' });
+        }
 
         // Force HTTPS for Cloudinary or Use Relative Path for Local
         let audioUrl;
@@ -559,23 +559,21 @@ app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, re
             audioUrl = `/uploads/${req.file.filename}`;
         }
 
-        console.log("✅ Cloudinary URL generated:", audioUrl);
-
         // Save to DB (or JSON fallback)
         if (mongoose.connection.readyState === 1) {
             await LessonAudio.findOneAndUpdate(
-                { lessonId, text },
+                { lessonId, text, teacherId },
                 { audioUrl },
                 { upsert: true, new: true }
             );
-            console.log(`✅ Saved to MongoDB: [${text}] -> ${audioUrl}`);
+            console.log(`✅ Saved to MongoDB: Teacher ${teacherId} [${text}] -> ${audioUrl}`);
         } else {
-            console.warn("⚠️ MongoDB not connected. Saving to audio-map.json");
+            // Local fallback (Limited multi-tenancy for files)
             const map = loadAudioMap();
-            if (!map[lessonId]) map[lessonId] = {};
-            map[lessonId][text] = audioUrl;
+            const key = `${teacherId || 'default'}_${lessonId}`;
+            if (!map[key]) map[key] = {};
+            map[key][text] = audioUrl;
             saveAudioMap(map);
-            console.log(`✅ Saved to JSON Map: [${text}] -> ${audioUrl}`);
         }
 
         res.json({ audioUrl, text });
@@ -589,11 +587,34 @@ app.post('/api/lessons/:lessonId/custom-audio', uploadMiddleware, async (req, re
 app.get('/api/lessons/:lessonId/custom-audio', async (req, res) => {
     try {
         const { lessonId } = req.params;
+        let teacherId = null;
+
+        // Try to identify teacher from header (for teacher view) or from classId (for student view)
+        const authHeader = req.headers.authorization;
+        const { classId } = req.query;
+
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            try {
+                const token = authHeader.split(' ')[1];
+                const jwt = (await import('jsonwebtoken')).default;
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+                teacherId = decoded.id;
+            } catch (e) { /* ignore */ }
+        } else if (classId && mongoose.connection.readyState === 1) {
+            const cls = await ClassModel.findOne({ id: classId });
+            if (cls) teacherId = cls.teacherId;
+        }
 
         // Prioritize Mongo if connected
         if (mongoose.connection.readyState === 1) {
-            const audios = await LessonAudio.find({ lessonId });
+            // Find shared (null) or teacher-specific audio
+            const audios = await LessonAudio.find({
+                lessonId,
+                $or: [{ teacherId: null }, { teacherId }]
+            });
+
             // Convert to map: { "text": "url" }
+            // Teacher specific audio overrides global if both exist
             const audioMap = audios.reduce((acc, curr) => {
                 acc[curr.text || ""] = curr.audioUrl;
                 return acc;
@@ -602,9 +623,9 @@ app.get('/api/lessons/:lessonId/custom-audio', async (req, res) => {
         }
 
         // Fallback to local JSON map
-        console.log(`⚠️ MongoDB disconnected. reading from audio-map.json for lesson ${lessonId}`);
         const map = loadAudioMap();
-        res.json(map[lessonId] || {});
+        const key = `${teacherId || 'default'}_${lessonId}`;
+        res.json(map[key] || map[lessonId] || {});
     } catch (error) {
         console.error("Fetch Audio Error:", error);
         res.status(500).json({ error: 'Failed to fetch audio' });

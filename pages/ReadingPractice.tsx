@@ -274,8 +274,14 @@ export const ReadingPractice: React.FC = () => {
     const fetchCustomAudio = async () => {
       if (!lesson?.id) return;
       try {
-        // Replace with your actual API endpoint
-        const response = await fetch(`/api/lessons/${lesson.id}/custom-audio`);
+        const token = localStorage.getItem('teacher_token');
+        const classId = localStorage.getItem('student_class_id');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const url = `/api/lessons/${lesson.id}/custom-audio${classId ? `?classId=${classId}` : ''}`;
+        const response = await fetch(url, { headers });
+
         if (!response.ok) throw new Error('Network response was not ok');
         const data: Record<string, string> = await response.json();
         setCustomVoiceMap(data);
@@ -427,7 +433,14 @@ export const ReadingPractice: React.FC = () => {
 
   // --- TEACHER MODE LOGIC ---
   const startRecordingSample = async (text: string) => {
-    if (recordingTarget || isRecordingInitializing) return; // Prevent double start
+    if (recordingTarget || isRecordingInitializing) return;
+
+    // Stop all current audio
+    window.speechSynthesis.cancel();
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+    }
 
     try {
       setIsRecordingInitializing(true);
@@ -505,6 +518,7 @@ export const ReadingPractice: React.FC = () => {
 
       const data = await response.json();
       setCustomVoiceMap(prev => ({ ...prev, [text]: data.audioUrl }));
+      setNotification({ message: 'Đã lưu giọng đọc mẫu thành công! Bạn có thể nghe lại ngay.', type: 'success' });
       playSuccess();
     } catch (error) {
       console.error("Upload failed:", error);
@@ -1248,13 +1262,25 @@ export const ReadingPractice: React.FC = () => {
                         `}
                     >
                       {p}
-                      <span className="absolute -top-3 -right-3 flex gap-1">
+                      <span className="absolute -top-3 -right-3 flex gap-1 z-10">
                         {isTarget && <span className="bg-red-500 text-white p-1.5 rounded-full shadow"><Mic className="w-3 h-3" /></span>}
                         {!isTarget && isPlaying && <span className="bg-green-500 text-white p-1.5 rounded-full shadow"><Volume2 className="w-3 h-3" /></span>}
                         {isUploadingTarget && <span className="bg-blue-500 text-white p-1.5 rounded-full shadow animate-spin"><Loader2 className="w-3 h-3" /></span>}
-                        {!isTarget && !isPlaying && hasCustom && !isTeacherMode && <span className="bg-orange-500 text-white text-[9px] px-1.5 py-0.5 rounded-full shadow font-bold">GV</span>}
-                        {!isTarget && !isPlaying && isTeacherMode && <span className="bg-gray-200 text-gray-500 p-1 rounded-full"><Mic className="w-3 h-3" /></span>}
+                        {!isTarget && !isPlaying && hasCustom && <span className="bg-orange-500 text-white text-[9px] px-1.5 py-0.5 rounded-full shadow font-bold">{isTeacherMode ? 'GV' : 'GV'}</span>}
+                        {!isTarget && !isPlaying && !hasCustom && isTeacherMode && <span className="bg-gray-200 text-gray-500 p-1 rounded-full"><Mic className="w-3 h-3" /></span>}
                       </span>
+
+                      {isTeacherMode && hasCustom && !isTarget && !isPlaying && (
+                        <button
+                          className="absolute -bottom-2 -left-2 bg-blue-500 text-white p-1.5 rounded-full shadow-md z-20 hover:scale-110 transition-transform"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playContent(p, id);
+                          }}
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </span>
                   </div>
                 );
@@ -1318,8 +1344,23 @@ export const ReadingPractice: React.FC = () => {
                       {!isTarget && !isPlaying && isTeacherMode && <Mic className="w-4 h-4 text-gray-400" />}
                     </div>
 
-                    {hasCustom && !isTeacherMode && !isTarget && (
-                      <span className="absolute bottom-1 right-1 bg-orange-500 text-white text-[9px] px-1.5 rounded shadow-sm">GV</span>
+                    {hasCustom && (
+                      <span className="absolute bottom-1 right-1 bg-orange-500 text-white text-[9px] px-1.5 rounded shadow-sm flex items-center gap-1 z-10 transition-transform group-hover:scale-110">
+                        {isTeacherMode && isPlaying ? <Volume2 className="w-2.5 h-2.5" /> : 'GV'}
+                      </span>
+                    )}
+
+                    {isTeacherMode && hasCustom && !isTarget && !isPlaying && (
+                      <button
+                        className="absolute bottom-1 left-1 bg-blue-500 text-white p-1 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playContent(word, id);
+                        }}
+                        title="Nghe lại"
+                      >
+                        <Volume2 className="w-3 h-3" />
+                      </button>
                     )}
                   </div>
                 );
@@ -1380,7 +1421,21 @@ export const ReadingPractice: React.FC = () => {
                         {isTarget && <span className="text-xs text-red-500 font-bold animate-pulse flex items-center gap-1"><Mic className="w-3 h-3" /> Đang thu...</span>}
                         {isUploadingTarget && <span className="text-xs text-blue-500 font-bold animate-pulse flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Đang lưu...</span>}
                         {isPlaying && <Volume2 className="w-4 h-4 text-green-600" />}
+
+                        {isTeacherMode && hasCustom && !isTarget && !isPlaying && (
+                          <button
+                            className="p-1 px-2 bg-blue-100 text-blue-700 rounded border border-blue-200 text-xs flex items-center gap-1 hover:bg-blue-200 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playContent(line, id);
+                            }}
+                          >
+                            <Volume2 className="w-3 h-3" /> Nghe lại
+                          </button>
+                        )}
+
                         {hasCustom && !isTeacherMode && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200 font-bold">Giọng GV</span>}
+                        {hasCustom && isTeacherMode && <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded border border-orange-200 font-bold">Đã có mẫu</span>}
                       </div>
                     </div>
                   </div>
