@@ -912,6 +912,10 @@ const startServer = () => {
     // Điều này cho phép các health check của Render thành công ngay cả khi kết nối DB bị chậm.
     const server = app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 SERVER PROCESS IS UP and listening on port ${PORT}`);
+        console.log(`Available Routes: /api/submissions, /api/lessons, etc.`);
+        console.log("---------------------------------------------------------");
+        console.log("--- CODE VERSION: 10.0 (FINAL NUCLEAR FIX) ---");
+        console.log("---------------------------------------------------------");
         console.log(`👉 Local: http://localhost:${PORT}`);
 
         // Bây giờ, kết nối với cơ sở dữ liệu trong nền.

@@ -95,33 +95,10 @@ export const evaluateReading = async (
     // We continue anyway, in case the key is shimmed in a way we can't see, or to hit the catch block naturally.
   }
 
-  // STEP 1: Discover Valid Models
-  let selectedModel = 'gemini-1.5-flash';
-  let discoveryLog = "";
-
-  try {
-    const validModels = await fetchValidModels(apiKey);
-
-    // Debug: List top 3 valid models to see what we have
-    const top3 = validModels.slice(0, 3).join(", ");
-    discoveryLog = `Found ${validModels.length} Valid Models: [${top3}...]`;
-
-    if (validModels.length > 0) {
-      // Prioritize 1.5 Flash if available, as it's the most stable for v1beta currently
-      if (validModels.includes('gemini-1.5-flash')) {
-        selectedModel = 'gemini-1.5-flash';
-      } else {
-        selectedModel = selectBestModel(validModels);
-      }
-      discoveryLog += ` -> Selected: ${selectedModel}`;
-    } else {
-      discoveryLog += " -> No valid models found, defaulting to gemini-1.5-flash.";
-      selectedModel = 'gemini-1.5-flash';
-    }
-  } catch (e) {
-    discoveryLog = "Discovery Failed, defaulting to gemini-1.5-flash";
-    selectedModel = 'gemini-1.5-flash';
-  }
+  // STEP 1: FORCE Model Selection (No Discovery)
+  // Discovery is too fragile and hits rate limits. We just blindly use the most stable model.
+  const selectedModel = 'gemini-1.5-flash-001';
+  const discoveryLog = "Discovery Skipped -> Forced gemini-1.5-flash-001";
 
   // STEP 2: Construct Payload
   let parts: any[] = [];
