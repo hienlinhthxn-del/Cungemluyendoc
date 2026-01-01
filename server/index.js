@@ -914,7 +914,7 @@ const startServer = () => {
         console.log(`🚀 SERVER PROCESS IS UP and listening on port ${PORT}`);
         console.log(`Available Routes: /api/submissions, /api/lessons, etc.`);
         console.log("---------------------------------------------------------");
-        console.log("--- CODE VERSION: 10.0 (FINAL NUCLEAR FIX) ---");
+        console.log("--- CODE VERSION: 12.0 (DYNAMIC DISCOVERY RESTORED) ---");
         console.log("---------------------------------------------------------");
         console.log(`👉 Local: http://localhost:${PORT}`);
 

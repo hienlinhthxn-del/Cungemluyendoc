@@ -95,12 +95,7 @@ export const evaluateReading = async (
     // We continue anyway, in case the key is shimmed in a way we can't see, or to hit the catch block naturally.
   }
 
-  // STEP 1: FORCE Model Selection (No Discovery)
-  // Discovery is too fragile and hits rate limits. We just blindly use the most stable model.
-  const selectedModel = 'gemini-1.5-flash-001';
-  const discoveryLog = "Discovery Skipped -> Forced gemini-1.5-flash-001";
-
-  // STEP 2: Construct Payload
+  // STEP 2: Construct Payload (Moved up so it's ready for the loop)
   let parts: any[] = [];
   const systemPrompt = `Role: Extremely Strict Vietnamese Grade 1 Reading Teacher (Standard Northern Accent).
     Task: Evaluate the student's pronunciation of: "${targetText}".
@@ -144,15 +139,44 @@ export const evaluateReading = async (
     }
   };
 
-  // 3. ROBUST EXECUTION WITH FALLBACK
-  const modelsToTry = [
-    'gemini-2.0-flash-exp', // Try the newest first (it worked before until limit)
-    'gemini-1.5-flash',     // Generic alias (usually points to 001 or 002)
-    'gemini-1.5-flash-001', // Backup versioned
-    'gemini-1.5-flash-8b',  // Smaller, faster model
-    'gemini-1.5-pro',
-    'gemini-1.0-pro'
-  ];
+  // STEP 1: Dynamic Discovery (Restored & Robust)
+  // We MUST ask the API what models are valid for this specific key to avoid 404s.
+  let modelsToTry: string[] = [];
+  let discoveryLog = "";
+
+  try {
+    const validModels = await fetchValidModels(apiKey);
+    discoveryLog = `Found ${validModels.length} Valid Models.`;
+
+    if (validModels.length > 0) {
+      // INTELLIGENT SORTING:
+      // 1. Try 1.5 Flash first (fast, cheap, stable)
+      const flashModels = validModels.filter(m => m.includes('1.5-flash'));
+      // 2. Try 2.0 Flash (new, experimental, good backup)
+      const twoModels = validModels.filter(m => m.includes('2.0') || m.includes('2.5'));
+      // 3. Try Pro models (slower but good)
+      const proModels = validModels.filter(m => m.includes('pro'));
+      // 4. Others
+      const others = validModels.filter(m => !m.includes('flash') && !m.includes('pro'));
+
+      modelsToTry = [...flashModels, ...twoModels, ...proModels, ...others];
+      discoveryLog += ` Priority: [${modelsToTry.slice(0, 3).join(', ')}...]`;
+    }
+  } catch (e) {
+    discoveryLog += " Discovery Failed.";
+  }
+
+  // Fallback if discovery returned nothing (e.g. network error listing models)
+  if (modelsToTry.length === 0) {
+    modelsToTry = [
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-001',
+      'gemini-1.5-pro',
+      'gemini-1.0-pro'
+    ];
+    discoveryLog += " Using Hardcoded Fallback List.";
+  }
+
   // Deduplicate models
   const uniqueModels = [...new Set(modelsToTry)];
 
